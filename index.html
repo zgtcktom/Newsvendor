@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' ; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'">
+    <title>Hello World!</title>
+    <style>
+        html,
+        body {
+            margin: 0;
+            height: 100vh;
+        }
+
+        .main-container {
+            display: flex;
+            height: 100%;
+        }
+
+        .left-panel,
+        .right-panel {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .left-panel {
+            background: lightblue;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .right-panel {
+            background: #f5f5f5;
+        }
+
+        .time-bar {
+            display: flex;
+            background: #652CB3;
+            height: max(6vh, 3em);
+        }
+
+        .time-button {
+            cursor: pointer;
+            display: flex;
+            border-radius: 50%;
+            background: #eee;
+            height: max(3.75vh, 2.25em);
+            aspect-ratio: 1 / 1;
+            margin: auto 0.7em;
+        }
+
+        .time-button:hover {
+            background: #eeed;
+        }
+
+        .time-button.pause::before,
+        .time-button.pause::after {
+            display: block;
+            font: max(2.5vh, 1.5em) arial;
+            content: '❚';
+            color: #652CB3;
+            margin: auto;
+        }
+
+        .time-button.pause::before {
+            padding: 0 0 0.05em 15%;
+        }
+
+        .time-button.pause::after {
+            padding: 0 15% 0.05em 0;
+        }
+
+        .time-button.play::before {
+            display: block;
+            content: '▶';
+            color: #652CB3;
+            font: max(2.5vh, 1.5em) arial;
+            margin: auto;
+            padding: 0.1em 0 0 0.1em;
+        }
+
+        .time-text {
+            color: #eee;
+            margin: auto 0;
+            font-size: 1.2em;
+        }
+
+        .time-next {
+            cursor: pointer;
+            color: #eee;
+            margin: auto 1em auto auto;
+            font-size: 1.2em;
+        }
+
+        .playground {
+            background: #e1d8ec;
+            flex: 1;
+            position: relative;
+        }
+
+        .sprite {
+            position: absolute;
+            transform: translateY(-50%) translateX(-50%);
+            aspect-ratio: 1 / 1;
+            background-repeat: no-repeat;
+            background-size: contain;
+            background-position: center center;
+            width: min(7.5vw, 7.5vh);
+        }
+
+        .sprite.warehouse {
+            top: 50%;
+            left: 50%;
+            background-image: url("imgs/warehouse.png");
+            background-size: 140%;
+            width: min(15vw, 15vh);
+        }
+
+        .sprite.truck-front {
+            top: 50%;
+            left: 10%;
+            background-image: url("imgs/front.png");
+        }
+
+        .sprite.truck-back {
+            top: 10%;
+            left: 50%;
+            background-image: url("imgs/back.png");
+        }
+
+        .sprite.vendor {
+            top: 20%;
+            left: 20%;
+            background-image: url("imgs/vendor.png");
+            width: min(15vw, 15vh);
+        }
+
+        .learning-table {
+            box-sizing: border-box;
+            margin: 1em auto;
+            width: calc(100% - 2em);
+            background-color: #fff;
+            border-collapse: collapse;
+            color: #222;
+        }
+
+        .learning-table td {
+            padding: 0.5em;
+        }
+
+        .learning-table thead {
+            border: 1px solid #444;
+            background-color: #444;
+            color: #eee;
+            font-weight: bold;
+        }
+
+        .learning-table tbody {
+            border: 1px solid #bbb;
+        }
+
+        .learning-table tbody tr:nth-child(odd) {
+            background-color: #eee;
+        }
+
+        .learning-title {
+            display: flex;
+            margin: 1rem;
+            font-size: 1.5em;
+        }
+
+        .setting-button {
+            margin-left: auto;
+            cursor: pointer;
+        }
+
+        .summary {
+            padding: 1em;
+        }
+
+        .summary-parts {
+            display: flex;
+            margin-bottom: 2em;
+            flex-wrap: wrap;
+        }
+
+        .summary-field {
+            flex: 1;
+            min-width: 20ch;
+        }
+
+        .summary-field-title {
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-bottom: 0.2em;
+        }
+
+        .summary-total-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 0.2em;
+        }
+
+        .goal {
+            margin-top: -0.5em;
+            text-align: right;
+        }
+
+        .goal-bar,
+        .goal-progress {
+            box-sizing: border-box;
+            border: 1px solid #0CA789;
+            width: 100%;
+            height: 1.6em;
+        }
+
+        .goal-bar {
+            margin-top: 0.2em;
+        }
+
+        .goal-progress {
+            width: 50%;
+            margin: -1px 0 0 -1px;
+            background-color: #0CA789;
+        }
+
+        .use-policy {
+            margin: 0 1em 1em 1em;
+        }
+
+        .use-policy-label {
+            font-weight: bold;
+            margin-bottom: 0.3em;
+        }
+
+        .selectbar {
+            display: inline-flex;
+            border: 1px solid #0CA789;
+            overflow: hidden;
+            flex-wrap: wrap;
+        }
+
+        .selectbar-option input[type=radio] {
+            display: none;
+        }
+
+        .selectbar-option {
+            min-width: 15ch;
+            flex: 1;
+            cursor: pointer;
+            padding: 0.4em 0.5em;
+            color: #111;
+            border-right: 1px solid #0CA789;
+        }
+
+        .selectbar-option:last-child {
+            border-right: none;
+        }
+
+        .selectbar-option:hover:not(.selectbar-option:has(input[type=radio]:checked)) {
+            background-color: #D6EBE6;
+            color: #000;
+        }
+
+        .selectbar-option:has(input[type=radio]:checked) {
+            background-color: #0CA789;
+            color: #eee;
+        }
+
+        .popup {
+            position: fixed;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            top: 10vh;
+            left: 10vw;
+            width: 80vw;
+            height: 80vh;
+            border: 1px solid #aaa;
+            box-shadow: 0 0 3px #aaa;
+            background-color: #fff;
+        }
+
+        .popup-topbar {
+            display: flex;
+        }
+
+        .popup-topbar-title {
+            font-size: 1.75em;
+            margin: 0.5em auto;
+            padding: max(1.4vmin, 0.7em) max(2vmin, 1em);
+        }
+
+        .popup-topbar-buttons {
+            position: absolute;
+            right: 0;
+            top: 0;
+            padding: max(1.4vmin, 0.7em) max(2vmin, 1em);
+        }
+
+        .popup-topbar-buttons a {
+            color: #666;
+            cursor: pointer;
+        }
+
+        .popup-content {
+            flex: 1;
+            padding: max(2vmin, 1em);
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-field {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 0.5em;
+        }
+
+        .form-field label {
+            width: 20%;
+            min-width: 20ch;
+            margin: auto 0;
+            padding: 0.5em 0;
+        }
+
+        .form-field input {
+            flex: 1;
+            padding: 0.8em 0.9em;
+            font-size: 1.1em;
+            border: 1px solid #bbb;
+            min-width: 30ch;
+        }
+
+        .form-buttons {
+            text-align: right;
+            padding-top: 1em;
+            margin-top: auto;
+        }
+
+        .form-buttons button {
+            font-size: 1.1em;
+            cursor: pointer;
+            padding: 1em;
+            background-color: #21C87A;
+            color: #fff;
+            border: 0;
+            border-radius: 5px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .form-buttons button:hover {
+            background-color: #1faf6c;
+        }
+
+        .form-buttons button:active {
+            background-color: #198854;
+        }
+    </style>
+    <script src="src/all.min.js" async="false"></script>
+</head>
+
+<body>
+    <div class="main-container">
+        <div class="left-panel">
+            <div class="time-bar">
+                <div class="time-button play" id="play-button"></div>
+                <div class="time-button pause" id="pause-button"></div>
+                <div class="time-text"><span id="remaining-day">0</span> Days Remaining</div>
+                <div class="time-next" id="next"><i class="fas fa-step-forward"></i></div>
+            </div>
+            <div class="playground">
+                <div class="sprite warehouse"></div>
+                <div class="sprite vendor"></div>
+                <div class="sprite truck-front"></div>
+                <div class="sprite truck-back"></div>
+            </div>
+        </div>
+        <div class="right-panel">
+            <div class="learning-title">
+                <div>Learning policy</div>
+                <div class="setting-button" onclick="openSettings()"><i class="fa-solid fa-gear"></i></div>
+            </div>
+            <table class="learning-table">
+                <thead>
+                    <tr>
+                        <td style="width: 30%;">Choice</td>
+                        <td>IE Value</td>
+                    </tr>
+                </thead>
+                <tbody id="choices">
+                    <tr>
+                        <td>0</td>
+                        <td>0</td>
+                    </tr>
+                    <tr>
+                        <td>1</td>
+                        <td>0</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="use-policy">
+                <div class="use-policy-label">Use policy: </div>
+                <div class="selectbar">
+                    <label class="selectbar-option">
+                        <input type="radio" value="manual" name="use-policy">
+                        Manual Policy
+                    </label>
+                    <label class="selectbar-option">
+                        <input type="radio" value="learned" name="use-policy" checked="checked">
+                        Learned Policy
+                    </label>
+                </div>
+            </div>
+            <hr>
+            <div class="summary">
+                <div class="summary-parts">
+                    <div class="summary-field">
+                        <div class="summary-field-title">
+                            Total units sold
+                        </div>
+                        <div class="summary-field-amount" id="total-units">
+                            123
+                        </div>
+                    </div>
+                    <div class="summary-field">
+                        <div class="summary-field-title">
+                            Total revenue
+                        </div>
+                        <div class="summary-field-amount" id="total-revenue">
+                            $3164
+                        </div>
+                    </div>
+                    <div class="summary-field">
+                        <div class="summary-field-title">
+                            Total costs
+                        </div>
+                        <div class="summary-field-amount" id="total-costs">
+                            $5945
+                        </div>
+                    </div>
+                </div>
+                <div class="summary-total">
+                    <div class="summary-total-title">Total profit</div>
+                    <div id="total-profit">$105411 - $523156 = $23212</div>
+                    <div class="goal">Goal: $<span id="goal">70000</span></div>
+                    <div class="goal-bar">
+                        <div class="goal-progress" id="total-profit-progress"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:none;">
+                <nav>asd</nav>
+                <div>
+                    <h1>Hello World!</h1>
+                    We are using Node.js <span id="node-version"></span>,
+                    Chromium <span id="chrome-version"></span>,
+                    and Electron <span id="electron-version"></span>.
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="popup-wrapper" style="display:none;">
+        <div class="popup" id="popup">
+            <div class="popup-topbar">
+                <div class="popup-topbar-title">
+                    Settings
+                </div>
+                <div class="popup-topbar-buttons">
+                    <a onclick="hide()"><i class="fa fa-close"></i></a>
+                </div>
+            </div>
+            <div class="popup-content">
+                <form id="popup-form">
+                    <div class="form-field">
+                        <label>alpha</label>
+                        <input type="text" value="0.2">
+                    </div>
+                </form>
+                <div class="form-buttons">
+                    <button id="confirm">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+
+        let playButton = document.getElementById('play-button');
+        let pauseButton = document.getElementById('pause-button');
+        let toggleState = 1;
+
+        playButton.onclick = pauseButton.onclick = () => togglePlayPause();
+        function setPlayPause(state) {
+            if (toggleState) {
+                playButton.style.display = '';
+                pauseButton.style.display = 'none';
+            } else {
+                playButton.style.display = 'none';
+                pauseButton.style.display = '';
+            }
+        }
+        function togglePlayPause() {
+            toggleState = !toggleState;
+            setPlayPause(toggleState);
+        }
+        function getPlayPauseState() {
+            return toggleState;
+        }
+        setPlayPause(toggleState);
+    </script>
+    <script src="./newsvendor.js"></script>
+    <script src="./renderer.js"></script>
+    <script>
+
+        function updateTable(rows) {
+            let table = document.getElementById('choices');
+            table.innerHTML = '';
+            let fragment = document.createDocumentFragment();
+            for (let row of rows) {
+                let tr = document.createElement('tr');
+                for (let col of row) {
+                    let td = document.createElement('td');
+                    td.innerHTML = col;
+                    tr.append(td);
+                }
+                fragment.append(tr);
+            }
+            table.append(fragment);
+        }
+        window.popup = function popup(form) {
+            let data = {};
+            let fragment = document.createDocumentFragment();
+            for (let field of Object.keys(form)) {
+                let fieldElement = document.createElement('div');
+                fieldElement.classList.add('form-field');
+                let label = document.createElement('label');
+                let input = document.createElement('input');
+                label.innerHTML = field;
+                input.setAttribute('type', 'text');
+                input.value = form[field];
+                fieldElement.append(label, input);
+                fragment.append(fieldElement);
+                data[field] = () => input.value;
+            }
+            let formField = document.getElementById('popup-form');
+            formField.innerHTML = '';
+            formField.appendChild(fragment);
+            return data;
+        }
+        function hide() {
+            let popup = document.getElementById('popup');
+            popup.parentElement.style.display = 'none';
+        }
+        function show() {
+            let popup = document.getElementById('popup');
+            popup.parentElement.style.display = 'block';
+        }
+
+        function run_simulation(params, theta = 0) {
+            let problem = new Newsvendor(params);
+            let iter = problem.runIter(theta);
+            return {
+                next: () => {
+                    let { value, done } = iter.next();
+                    return { value, done };
+                },
+            }
+        }
+
+        let data = popup({
+            alpha: 0.2,
+            lower: 20,
+            upper: 40,
+            bias: -4,
+            std: 2,
+            overageCost: 2,
+            underageCost: 8,
+            iterations: 1000,
+            testTrial: 10,
+            thetaList: '0, 1, 2, 3, 4, 5',
+            intervalRange: '0, 10',
+            intervalStep: 1,
+            sellingPrice: 0,
+            orderCost: 0,
+            goal: 10000,
+            theta: 0,
+            time: 0,
+        });
+
+        function openSettings() {
+            function submitSettings(data) {
+                hide();
+                let results = {};
+                for (let key of Object.keys(data)) {
+                    let value = data[key]();
+                    if (['thetaList', 'intervalRange'].includes(key)) {
+                        value = value.split(',').map((elem) => +elem.trim());
+                    } else {
+                        value = +value;
+                    }
+                    results[key] = value;
+                }
+                console.log(results);
+                let { intervalRange, intervalStep } = results;
+                let mapping = {};
+                for (let value = intervalRange[0]; value <= intervalRange[1]; value += intervalStep) {
+                    mapping[value] = 'N/A';
+                }
+                updateTable(Object.entries(mapping));
+
+                let controller = run_simulation(results, results.theta);
+
+                let remainingDay = document.getElementById('remaining-day');
+                let totalCosts = document.getElementById('total-costs');
+                let totalUnits = document.getElementById('total-units');
+                let totalRevenue = document.getElementById('total-revenue');
+                let totalProfit = document.getElementById('total-profit');
+                let goal = document.getElementById('goal');
+                let totalProfitProgress = document.getElementById('total-profit-progress');
+
+                goal.innerHTML = results.goal;
+                let next = document.getElementById('next');
+                let accum_units = 0;
+                let days = results.iterations;
+                remainingDay.innerHTML = days;
+                let { sellingPrice, orderCost } = results;
+
+                totalUnits.innerHTML = `0`;
+                totalRevenue.innerHTML = `$0`;
+                totalCosts.innerHTML = `$0`;
+                totalProfit.innerHTML = `$0 - $0 = $0`;
+                totalProfitProgress.style.width = `0%`;
+
+                let choiceHist = [];
+
+                let accum_reward_at_timestep;
+                next.style.display = '';
+                next.onclick = () => {
+                    let { value, done } = controller.next();
+                    console.log(value, done);
+                    if (done) {
+                        next.onclick = () => { };
+                        next.style.display = 'none';
+                        clearInterval(handler);
+                        console.log(choiceHist);
+                    } else {
+                        let record = value;
+                        let choice = record.choice;
+                        let quantity = choice.quantity;
+                        mapping[quantity] = choice.getIEValue();
+                        updateTable(Object.entries(mapping));
+
+                        choiceHist[quantity] = (choiceHist[quantity] || 0) + 1;
+
+                        days--;
+                        remainingDay.innerHTML = days;
+                        accum_units += Math.min(record.decision.order, record.nextState.demand);
+                        let revenue = (accum_units * sellingPrice).toFixed(1);
+                        // let costs = (accum_units * orderCost).toFixed(1);
+                        if(record.timestep == 100){
+                            accum_reward_at_timestep=record.accum_reward;
+                        }
+                        // let costs = (-record.accum_reward + accum_units * orderCost).toFixed(1);
+                        let costs = -(record.accum_reward - accum_reward_at_timestep).toFixed(1);
+                        let profit = revenue - costs;
+                        let progress = Math.min(1, profit / results.goal) * 100;
+
+                        totalUnits.innerHTML = `${accum_units}`;
+                        totalRevenue.innerHTML = `$${revenue}`;
+                        totalCosts.innerHTML = `$${costs}`;
+                        totalProfit.innerHTML = `$${revenue} - $${costs} = $${profit}`;
+
+                        totalProfitProgress.style.width = `${progress}%`;
+                    }
+                };
+
+                let handler = setInterval(() => {
+                    if (getPlayPauseState()) {
+                        next.onclick();
+                    }
+                }, results.time);
+
+                return data;
+            }
+            let confirm = document.getElementById('confirm');
+            confirm.onclick = () => data = submitSettings(data);
+            show();
+        }
+
+    </script>
+</body>
+
+</html>
