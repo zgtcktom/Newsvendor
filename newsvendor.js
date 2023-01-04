@@ -1,5 +1,5 @@
 'use strict';
-window.Newsvendor = (function () {
+window.Newsvendor = (function() {
     var randint = (min, max) => Math.floor(Math.random() * (max - min)) + min;
     var gaussianRandom = (mean = 0, stdev = 1) => {
         let u = 1 - Math.random();
@@ -76,8 +76,10 @@ window.Newsvendor = (function () {
 
         step(action) {
             this.n++;
+            let state = { bias: this.state.bias };
             this.update(this.transition_fn(this.state));
-            let decision = this.getDecision(this.state, action);
+            state.estimate = this.state.estimate;
+            let decision = this.getDecision(state, action);
             return { reward: this.reward_fn(this.state, decision), decision };
         }
 
@@ -162,7 +164,8 @@ window.Newsvendor = (function () {
             this.env = new Model(params);
         }
 
-        *runIter(theta, verbose = false) {
+        *
+        runIter(theta, verbose = false) {
             let params = this.params;
             let agent = new LearningAgent(params, theta);
             let env = this.env;
@@ -227,7 +230,7 @@ window.Newsvendor = (function () {
                     let result = {
                         params: { theta },
                         accum_reward: history[history.length - 1].accum_reward,
-                        accum_reward_after_30: sum(history.slice(30).map((record) => record.reward)),// after 30 time periods
+                        accum_reward_after_30: sum(history.slice(30).map((record) => record.reward)), // after 30 time periods
                     };
                     trialResults.push(result);
                 }
@@ -251,7 +254,7 @@ window.Newsvendor = (function () {
         overageCost: 2,
         underageCost: 8,
         iterations: 60,
-        testTrial: 100,
+        testTrial: 10,
         thetaList: [0, 1, 2, 3, 4, 5],
         intervalRange: [0, 10],
         intervalStep: 1,
