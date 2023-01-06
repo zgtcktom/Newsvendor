@@ -273,5 +273,7 @@ window.Newsvendor = (function() {
     // grid search
     console.log(problem.policySearch());
 
+    // https://terrorgum.com/tfox/books/learninginembeddedsystems.pdf
+
     return Newsvendor;
 })();
