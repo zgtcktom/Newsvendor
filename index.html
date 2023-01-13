@@ -1,725 +1,1171 @@
 <!DOCTYPE html>
 <html>
+	<head>
+		<meta charset="UTF-8" />
+		<!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
+		<meta
+			http-equiv="Content-Security-Policy"
+			content="default-src 'self' ; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'"
+		/>
+		<title>Hello World!</title>
+		<style>
+			html,
+			body {
+				font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Fira Sans,
+					Droid Sans, Helvetica Neue, sans-serif;
+				margin: 0;
+				height: 100vh;
+			}
 
-<head>
-    <meta charset="UTF-8">
-    <!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' ; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'">
-    <title>Hello World!</title>
-    <style>
-        html,
-        body {
-            margin: 0;
-            height: 100vh;
-        }
-        
-        .main-container {
-            display: flex;
-            height: 100%;
-        }
-        
-        .left-panel,
-        .right-panel {
-            flex: 1;
-            overflow-y: auto;
-        }
-        
-        .left-panel {
-            background: lightblue;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .right-panel {
-            background: #f5f5f5;
-        }
-        
-        .time-bar {
-            display: flex;
-            background: #652CB3;
-            height: max(6vh, 3em);
-        }
-        
-        .time-button {
-            cursor: pointer;
-            display: flex;
-            border-radius: 50%;
-            background: #eee;
-            height: max(3.75vh, 2.25em);
-            aspect-ratio: 1 / 1;
-            margin: auto 0.7em;
-        }
-        
-        .time-button:hover {
-            background: #eeed;
-        }
-        
-        .time-button.pause::before,
-        .time-button.pause::after {
-            display: block;
-            font: max(2.5vh, 1.5em) arial;
-            content: '❚';
-            color: #652CB3;
-            margin: auto;
-        }
-        
-        .time-button.pause::before {
-            padding: 0 0 0.05em 15%;
-        }
-        
-        .time-button.pause::after {
-            padding: 0 15% 0.05em 0;
-        }
-        
-        .time-button.play::before {
-            display: block;
-            content: '▶';
-            color: #652CB3;
-            font: max(2.5vh, 1.5em) arial;
-            margin: auto;
-            padding: 0.1em 0 0 0.1em;
-        }
-        
-        .time-text {
-            color: #eee;
-            margin: auto 0;
-            font-size: 1.2em;
-        }
-        
-        .time-next {
-            cursor: pointer;
-            color: #eee;
-            margin: auto 1em auto auto;
-            font-size: 1.2em;
-        }
-        
-        .playground {
-            background: #e1d8ec;
-            flex: 1;
-            position: relative;
-        }
-        
-        .sprite {
-            position: absolute;
-            transform: translateY(-50%) translateX(-50%);
-            aspect-ratio: 1 / 1;
-            background-repeat: no-repeat;
-            background-size: contain;
-            background-position: center center;
-            width: min(7.5vw, 7.5vh);
-        }
-        
-        .sprite.warehouse {
-            top: 50%;
-            left: 50%;
-            background-image: url("imgs/warehouse.png");
-            background-size: 140%;
-            width: min(15vw, 15vh);
-        }
-        
-        .sprite.truck-front {
-            top: 50%;
-            left: 10%;
-            background-image: url("imgs/front.png");
-        }
-        
-        .sprite.truck-back {
-            top: 10%;
-            left: 50%;
-            background-image: url("imgs/back.png");
-        }
-        
-        .sprite.vendor {
-            top: 20%;
-            left: 20%;
-            background-image: url("imgs/vendor.png");
-            width: min(15vw, 15vh);
-        }
-        
-        .learning-table {
-            box-sizing: border-box;
-            margin: 1em auto;
-            width: calc(100% - 2em);
-            background-color: #fff;
-            border-collapse: collapse;
-            color: #222;
-        }
-        
-        .learning-table td {
-            padding: 0.5em;
-        }
-        
-        .learning-table thead {
-            border: 1px solid #444;
-            background-color: #444;
-            color: #eee;
-            font-weight: bold;
-        }
-        
-        .learning-table tbody {
-            border: 1px solid #bbb;
-        }
-        
-        .learning-table tbody tr:nth-child(odd) {
-            background-color: #eee;
-        }
-        
-        .learning-title {
-            display: flex;
-            margin: 1rem;
-            font-size: 1.5em;
-        }
-        
-        .setting-button {
-            margin-left: auto;
-            cursor: pointer;
-        }
-        
-        .summary {
-            padding: 1em;
-        }
-        
-        .summary-parts {
-            display: flex;
-            margin-bottom: 2em;
-            flex-wrap: wrap;
-        }
-        
-        .summary-field {
-            flex: 1;
-            min-width: 20ch;
-        }
-        
-        .summary-field-title {
-            font-size: 1.1em;
-            font-weight: bold;
-            margin-bottom: 0.2em;
-        }
-        
-        .summary-total-title {
-            font-size: 1.3em;
-            font-weight: bold;
-            margin-bottom: 0.2em;
-        }
-        
-        .goal {
-            margin-top: -0.5em;
-            text-align: right;
-        }
-        
-        .goal-bar,
-        .goal-progress {
-            border: 1px solid #0CA789;
-            width: 100%;
-            height: 1.6em;
-        }
-        
-        .goal-bar {
-            margin-top: 0.2em;
-        }
-        
-        .goal-progress {
-            box-sizing: border-box;
-            width: 50%;
-            /* margin: -1px 0 0 -1px; */
-            background-color: #0CA789;
-        }
-        
-        .use-policy {
-            margin: 0 1em 1em 1em;
-        }
-        
-        .use-policy-label {
-            font-weight: bold;
-            margin-bottom: 0.3em;
-        }
-        
-        .selectbar {
-            display: inline-flex;
-            border: 1px solid #0CA789;
-            overflow: hidden;
-            flex-wrap: wrap;
-        }
-        
-        .selectbar-option input[type=radio] {
-            display: none;
-        }
-        
-        .selectbar-option {
-            min-width: 15ch;
-            flex: 1;
-            cursor: pointer;
-            padding: 0.4em 0.5em;
-            color: #111;
-            border-right: 1px solid #0CA789;
-        }
-        
-        .selectbar-option:last-child {
-            border-right: none;
-        }
-        
-        .selectbar-option:hover:not(.selectbar-option:has(input[type=radio]:checked)) {
-            background-color: #D6EBE6;
-            color: #000;
-        }
-        
-        .selectbar-option:has(input[type=radio]:checked) {
-            background-color: #0CA789;
-            color: #eee;
-        }
-        
-        .popup {
-            position: fixed;
-            display: flex;
-            flex-direction: column;
-            box-sizing: border-box;
-            top: 10vh;
-            left: 10vw;
-            width: 80vw;
-            height: 80vh;
-            border: 1px solid #aaa;
-            box-shadow: 0 0 3px #aaa;
-            background-color: #fff;
-        }
-        
-        .popup-topbar {
-            display: flex;
-        }
-        
-        .popup-topbar-title {
-            font-size: 1.75em;
-            margin: 0.5em auto;
-            padding: max(1.4vmin, 0.7em) max(2vmin, 1em);
-        }
-        
-        .popup-topbar-buttons {
-            position: absolute;
-            right: 0;
-            top: 0;
-            padding: max(1.4vmin, 0.7em) max(2vmin, 1em);
-        }
-        
-        .popup-topbar-buttons a {
-            color: #666;
-            cursor: pointer;
-        }
-        
-        .popup-content {
-            flex: 1;
-            padding: max(2vmin, 1em);
-            overflow: auto;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .form-field {
-            display: flex;
-            flex-wrap: wrap;
-            margin-bottom: 0.5em;
-        }
-        
-        .form-field label {
-            width: 20%;
-            min-width: 20ch;
-            margin: auto 0;
-            padding: 0.5em 0;
-        }
-        
-        .form-field input {
-            flex: 1;
-            padding: 0.8em 0.9em;
-            font-size: 1.1em;
-            border: 1px solid #bbb;
-            min-width: 30ch;
-        }
-        
-        .form-buttons {
-            text-align: right;
-            padding-top: 1em;
-            margin-top: auto;
-        }
-        
-        .form-buttons button {
-            font-size: 1.1em;
-            cursor: pointer;
-            padding: 1em;
-            background-color: #21C87A;
-            color: #fff;
-            border: 0;
-            border-radius: 5px;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        
-        .form-buttons button:hover {
-            background-color: #1faf6c;
-        }
-        
-        .form-buttons button:active {
-            background-color: #198854;
-        }
-    </style>
-    <script src="src/all.min.js" async="false"></script>
-</head>
+			.main-container {
+				display: flex;
+				height: 100%;
+			}
 
-<body>
-    <div class="main-container">
-        <div class="left-panel">
-            <div class="time-bar">
-                <div class="time-button play" id="play-button"></div>
-                <div class="time-button pause" id="pause-button"></div>
-                <div class="time-text"><span id="remaining-day">0</span> Days Remaining</div>
-                <div class="time-next" id="next"><i class="fas fa-step-forward"></i></div>
-            </div>
-            <div class="playground">
-                <div class="sprite warehouse"></div>
-                <div class="sprite vendor"></div>
-                <div class="sprite truck-front"></div>
-                <div class="sprite truck-back"></div>
-            </div>
-        </div>
-        <div class="right-panel">
-            <div class="learning-title">
-                <div>Learning policy</div>
-                <div class="setting-button" onclick="openSettings()"><i class="fa-solid fa-gear"></i></div>
-            </div>
-            <table class="learning-table">
-                <thead>
-                    <tr>
-                        <td style="width: 30%;">Choice</td>
-                        <td>IE Value</td>
-                    </tr>
-                </thead>
-                <tbody id="choices">
-                    <tr>
-                        <td>0</td>
-                        <td>0</td>
-                    </tr>
-                    <tr>
-                        <td>1</td>
-                        <td>0</td>
-                    </tr>
-                </tbody>
-            </table>
-            <div class="use-policy">
-                <div class="use-policy-label">Use policy: </div>
-                <div class="selectbar">
-                    <label class="selectbar-option">
-                        <input type="radio" value="manual" name="use-policy">
-                        Manual Policy
-                    </label>
-                    <label class="selectbar-option">
-                        <input type="radio" value="learned" name="use-policy" checked="checked">
-                        Learned Policy
-                    </label>
-                </div>
-            </div>
-            <hr>
-            <div class="summary">
-                <div class="summary-parts">
-                    <div class="summary-field">
-                        <div class="summary-field-title">
-                            Total units sold
-                        </div>
-                        <div class="summary-field-amount" id="total-units">
-                            123
-                        </div>
-                    </div>
-                    <div class="summary-field">
-                        <div class="summary-field-title">
-                            Total revenue
-                        </div>
-                        <div class="summary-field-amount" id="total-revenue">
-                            $3164
-                        </div>
-                    </div>
-                    <div class="summary-field">
-                        <div class="summary-field-title">
-                            Total costs
-                        </div>
-                        <div class="summary-field-amount" id="total-costs">
-                            $5945
-                        </div>
-                    </div>
-                </div>
-                <div class="summary-total">
-                    <div class="summary-total-title">Total profit</div>
-                    <div id="total-profit">$105411 - $523156 = $23212</div>
-                    <div class="goal">Goal: $<span id="goal">70000</span></div>
-                    <div class="goal-bar">
-                        <div class="goal-progress" id="total-profit-progress"></div>
-                    </div>
-                </div>
-            </div>
+			.left-panel,
+			.right-panel {
+				flex: 1;
+				overflow-y: auto;
+			}
 
-            <div style="display:none;">
-                <nav>asd</nav>
-                <div>
-                    <h1>Hello World!</h1>
-                    We are using Node.js <span id="node-version"></span>, Chromium <span id="chrome-version"></span>, and Electron <span id="electron-version"></span>.
-                </div>
-            </div>
-        </div>
-    </div>
-    <div id="popup-wrapper" style="display:none;">
-        <div class="popup" id="popup">
-            <div class="popup-topbar">
-                <div class="popup-topbar-title">
-                    Settings
-                </div>
-                <div class="popup-topbar-buttons">
-                    <a onclick="hide()"><i class="fa fa-close"></i></a>
-                </div>
-            </div>
-            <div class="popup-content">
-                <form id="popup-form">
-                    <div class="form-field">
-                        <label>alpha</label>
-                        <input type="text" value="0.2">
-                    </div>
-                </form>
-                <div class="form-buttons">
-                    <button id="confirm">Confirm</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <script>
-        let playButton = document.getElementById('play-button');
-        let pauseButton = document.getElementById('pause-button');
-        let toggleState = 1;
+			.left-panel {
+				background: #e1d8ec;
+				display: flex;
+				flex-direction: column;
+			}
 
-        playButton.onclick = pauseButton.onclick = () => togglePlayPause();
+			.right-panel {
+				background: #f5f5f5;
+				border-left: 1px solid #888;
+			}
 
-        function setPlayPause(state) {
-            if (toggleState) {
-                playButton.style.display = '';
-                pauseButton.style.display = 'none';
-            } else {
-                playButton.style.display = 'none';
-                pauseButton.style.display = '';
-            }
-        }
+			.time-bar {
+				display: flex;
+				background: #652cb3;
+				height: max(6vh, 3em);
+			}
 
-        function togglePlayPause() {
-            toggleState = !toggleState;
-            setPlayPause(toggleState);
-        }
+			.time-button {
+				cursor: pointer;
+				display: flex;
+				border-radius: 50%;
+				background: #eee;
+				height: max(3.75vh, 2.25em);
+				aspect-ratio: 1 / 1;
+				margin: auto 0.7em;
+				position: relative;
+			}
 
-        function getPlayPauseState() {
-            return toggleState;
-        }
-        setPlayPause(toggleState);
-    </script>
-    <script src="./newsvendor.js"></script>
-    <script src="./renderer.js"></script>
-    <script>
-        function updateTable(rows) {
-            let table = document.getElementById('choices');
-            table.innerHTML = '';
-            let fragment = document.createDocumentFragment();
-            for (let row of rows) {
-                let tr = document.createElement('tr');
-                for (let col of row) {
-                    let td = document.createElement('td');
-                    td.innerHTML = col;
-                    tr.append(td);
-                }
-                fragment.append(tr);
-            }
-            table.append(fragment);
-        }
-        window.popup = function popup(form) {
-            let data = {};
-            let fragment = document.createDocumentFragment();
-            for (let field of Object.keys(form)) {
-                let fieldElement = document.createElement('div');
-                fieldElement.classList.add('form-field');
-                let label = document.createElement('label');
-                let input = document.createElement('input');
-                label.innerHTML = field;
-                input.setAttribute('type', 'text');
-                input.value = form[field];
-                fieldElement.append(label, input);
-                fragment.append(fieldElement);
-                data[field] = () => input.value;
-            }
-            let formField = document.getElementById('popup-form');
-            formField.innerHTML = '';
-            formField.appendChild(fragment);
-            return data;
-        }
+			.time-button:hover {
+				background: #eeed;
+			}
 
-        function hide() {
-            let popup = document.getElementById('popup');
-            popup.parentElement.style.display = 'none';
-        }
+			.time-button.pause::before,
+			.time-button.pause::after {
+				display: block;
+				font: max(2.5vh, 1.5em) arial;
+				content: '❚';
+				color: #652cb3;
+				margin: auto;
+			}
 
-        function show() {
-            let popup = document.getElementById('popup');
-            popup.parentElement.style.display = 'block';
-        }
+			.time-button.pause::before {
+				padding: 0 0 0.05em 15%;
+			}
 
-        function run_simulation(params, theta = 0) {
-            let problem = new Newsvendor(params);
-            let iter = problem.runIter(theta);
-            return {
-                next: () => {
-                    let {
-                        value,
-                        done
-                    } = iter.next();
-                    return {
-                        value,
-                        done
-                    };
-                },
-            }
-        }
+			.time-button.pause::after {
+				padding: 0 15% 0.05em 0;
+			}
 
-        let data = popup({
-            alpha: 0.2,
-            lower: 20,
-            upper: 40,
-            bias: -4,
-            std: 2,
-            overageCost: 2,
-            underageCost: 8,
-            iterations: 60,
-            testTrial: 10,
-            thetaList: '0, 1, 2, 3, 4, 5',
-            intervalRange: '0, 10',
-            intervalStep: 1,
-            sellingPrice: 0,
-            orderCost: 0,
-            goal: 10000,
-            theta: 0,
-            time: 100,
-        });
+			.time-button.play::before {
+				position: absolute;
+				display: block;
+				content: '';
+				width: 80%;
+				height: 80%;
+				margin: 10% 0 0 10%;
+				background-color: #eee;
+				border-radius: 50%;
+			}
 
-        let prevHandler = null;
+			.time-button.play::after {
+				position: absolute;
+				display: block;
+				content: '▶';
+				color: #652cb3;
+				font: max(2.5vh, 1.5em) arial;
+				top: 50%;
+				left: 50%;
+				margin: -0.6em 0 0 -0.35em;
+			}
 
-        function openSettings() {
-            function submitSettings(data) {
-                hide();
-                if (prevHandler) {
-                    clearInterval(prevHandler);
-                }
-                let results = {};
-                for (let key of Object.keys(data)) {
-                    let value = data[key]();
-                    if (['thetaList', 'intervalRange'].includes(key)) {
-                        value = value.split(',').map((elem) => +elem.trim());
-                    } else {
-                        value = +value;
-                    }
-                    results[key] = value;
-                }
-                console.log(results);
-                let {
-                    intervalRange,
-                    intervalStep
-                } = results;
-                let mapping = {};
-                for (let value = intervalRange[0]; value <= intervalRange[1]; value += intervalStep) {
-                    mapping[value] = 'N/A';
-                }
-                updateTable(Object.entries(mapping));
+			.progress-bar {
+				width: 100%;
+				height: 100%;
+				background: conic-gradient(rgb(3, 133, 255) 80%, rgb(242, 242, 242) 80%);
+				border-radius: 50%;
+			}
 
-                let controller = run_simulation(results, results.theta);
+			.time-text {
+				color: #eee;
+				margin: auto 0;
+				font-size: 1.2em;
+			}
 
-                let remainingDay = document.getElementById('remaining-day');
-                let totalCosts = document.getElementById('total-costs');
-                let totalUnits = document.getElementById('total-units');
-                let totalRevenue = document.getElementById('total-revenue');
-                let totalProfit = document.getElementById('total-profit');
-                let goal = document.getElementById('goal');
-                let totalProfitProgress = document.getElementById('total-profit-progress');
+			.time-next {
+				cursor: pointer;
+				color: #eee;
+				margin: auto 1em auto auto;
+				font-size: 1.2em;
+			}
 
-                goal.innerHTML = results.goal;
-                let next = document.getElementById('next');
-                let accum_units = 0;
-                let days = results.iterations;
-                remainingDay.innerHTML = days;
-                let {
-                    sellingPrice,
-                    orderCost
-                } = results;
+			.playground {
+				background: #e1d8ec;
+				flex: 1;
+				position: relative;
+				min-height: 150px;
+			}
 
-                totalUnits.innerHTML = `0`;
-                totalRevenue.innerHTML = `$0`;
-                totalCosts.innerHTML = `$0`;
-                totalProfit.innerHTML = `$0 - $0 = $0`;
-                totalProfitProgress.style.width = `0%`;
+			.chart {
+				box-sizing: border-box;
+				border: 1px solid #aaa;
+				flex: 1;
+				max-height: 40%;
+				background: #fff;
+				position: relative;
+				min-height: 150px;
+				margin: 0.8em;
+				padding: 0.8em;
+				box-shadow: 0 0 2px #ccc;
+			}
 
-                let choiceHist = [];
-                let prevChoice = null;
+			.sprite {
+				position: absolute;
+				aspect-ratio: 1 / 1;
+				background-repeat: no-repeat;
+				background-size: contain;
+				background-position: center center;
+				width: 7.5vmin;
+				min-width: 25px;
+			}
 
-                let accum_reward_at_timestep;
-                next.style.display = '';
-                next.onclick = () => {
-                    let {
-                        value,
-                        done
-                    } = controller.next();
-                    console.log(value, done);
-                    if (done) {
-                        next.onclick = () => {};
-                        next.style.display = 'none';
-                        clearInterval(handler);
-                        console.log(choiceHist);
-                    } else {
-                        let record = value;
-                        let choice = record.choice;
-                        let quantity = choice.quantity;
-                        mapping[quantity] = choice.getIEValue();
-                        updateTable(Object.entries(mapping));
+			.sprite.truck-north {
+				transform: scaleX(1);
+				background-image: url('imgs/back.png');
+				top: 0%;
+				right: 0;
+			}
 
-                        choiceHist[quantity] = (choiceHist[quantity] || 0) + 1;
+			.sprite.truck-east {
+				transform: scaleX(-1);
+				background-image: url('imgs/front.png');
+				top: 20%;
+				right: 0;
+			}
 
-                        if (prevChoice) {
-                            prevChoice.style.outline = '';
-                        }
-                        let table = document.getElementById('choices');
-                        prevChoice = table.children[quantity];
-                        prevChoice.style.outline = '1px solid red';
+			.sprite.truck-south {
+				transform: scaleX(1);
+				background-image: url('imgs/front.png');
+				top: 40%;
+				right: 0;
+			}
 
-                        days--;
-                        remainingDay.innerHTML = days;
-                        accum_units += Math.min(record.decision.order, record.nextState.demand);
-                        let revenue = (accum_units * sellingPrice).toFixed(1);
-                        // let costs = (accum_units * orderCost).toFixed(1);
-                        if (record.timestep == 100) {
-                            accum_reward_at_timestep = record.accum_reward;
-                        }
-                        // let costs = (-record.accum_reward + accum_units * orderCost).toFixed(1);
-                        // let costs = -(record.accum_reward - accum_reward_at_timestep).toFixed(1);
-                        let costs = -(record.accum_reward).toFixed(1);
-                        let profit = revenue - costs;
-                        let progress = Math.min(1, profit / results.goal) * 100;
+			.sprite.truck-west {
+				transform: scaleX(-1);
+				background-image: url('imgs/back.png');
+				top: 60%;
+				right: 0;
+			}
 
-                        totalUnits.innerHTML = `${accum_units}`;
-                        totalRevenue.innerHTML = `$${revenue}`;
-                        totalCosts.innerHTML = `$${costs}`;
-                        totalProfit.innerHTML = `$${revenue} - $${costs} = $${profit}`;
+			.sprite.warehouse {
+				bottom: 20%;
+				left: 15%;
+				background-image: url('imgs/warehouse.png');
+				background-size: 140%;
+				width: 15vmin;
+				min-width: 50px;
+			}
 
-                        totalProfitProgress.style.width = `${progress}%`;
-                    }
-                };
+			.sprite.vendor {
+				top: 20%;
+				right: 15%;
+				background-image: url('imgs/vendor.png');
+				width: 15vmin;
+				min-width: 50px;
+			}
 
-                let handler = prevHandler = setInterval(() => {
-                    if (getPlayPauseState()) {
-                        next.onclick();
-                    }
-                }, results.time);
+			.learning-table {
+				box-sizing: border-box;
+				margin: 1em auto;
+				width: calc(100% - 2em);
+				background-color: #fff;
+				border-collapse: collapse;
+				color: #222;
+			}
 
-                return data;
-            }
-            let confirm = document.getElementById('confirm');
-            confirm.onclick = () => data = submitSettings(data);
-            show();
-        }
-    </script>
-</body>
+			.learning-table td {
+				padding: 0.5em;
+			}
 
+			.learning-table thead {
+				border: 1px solid #444;
+				background-color: #444;
+				color: #eee;
+				font-weight: bold;
+			}
+
+			.learning-table tbody {
+				border: 1px solid #bbb;
+			}
+
+			.learning-table tbody tr:nth-child(odd) {
+				background-color: #eee;
+			}
+
+			.learning-title {
+				display: flex;
+				margin: 1rem;
+				font-size: 1.5em;
+			}
+
+			.setting-button {
+				margin-left: auto;
+				cursor: pointer;
+			}
+
+			.summary {
+				padding: 1em;
+			}
+
+			.summary-parts {
+				display: flex;
+				margin-bottom: 2em;
+				flex-wrap: wrap;
+			}
+
+			.summary-field {
+				flex: 1;
+				min-width: 20ch;
+			}
+
+			.summary-field-title {
+				font-size: 1.1em;
+				font-weight: bold;
+				margin-bottom: 0.2em;
+			}
+
+			.summary-total-title {
+				font-size: 1.3em;
+				font-weight: bold;
+				margin-bottom: 0.2em;
+			}
+
+			.goal {
+				margin-top: -0.5em;
+				text-align: right;
+			}
+
+			.goal-bar,
+			.goal-progress {
+				border: 1px solid #0ca789;
+				width: 100%;
+				height: 1.6em;
+			}
+
+			.goal-bar {
+				margin-top: 0.2em;
+			}
+
+			.goal-progress {
+				box-sizing: border-box;
+				width: 50%;
+				/* margin: -1px 0 0 -1px; */
+				background-color: #0ca789;
+			}
+
+			.use-policy {
+				margin: 0 1em 1em 1em;
+			}
+
+			.use-policy-label {
+				font-weight: bold;
+				margin-bottom: 0.3em;
+			}
+
+			.selectbar {
+				display: inline-flex;
+				border: 1px solid #0ca789;
+				overflow: hidden;
+				flex-wrap: wrap;
+			}
+
+			.selectbar-option input[type='radio'] {
+				display: none;
+			}
+
+			.selectbar-option {
+				min-width: 15ch;
+				flex: 1;
+				cursor: pointer;
+				padding: 0.4em 0.5em;
+				color: #111;
+				border-right: 1px solid #0ca789;
+			}
+
+			.selectbar-option:last-child {
+				border-right: none;
+			}
+
+			.selectbar-option:hover:not(.selectbar-option:has(input[type='radio']:checked)) {
+				background-color: #d6ebe6;
+				color: #000;
+			}
+
+			.selectbar-option:has(input[type='radio']:checked) {
+				background-color: #0ca789;
+				color: #eee;
+			}
+
+			.popup {
+				position: fixed;
+				display: flex;
+				flex-direction: column;
+				box-sizing: border-box;
+				top: 10vh;
+				left: 10vw;
+				width: 80vw;
+				height: 80vh;
+				border: 1px solid #aaa;
+				box-shadow: 0 0 3px #aaa;
+				background-color: #fff;
+			}
+
+			.popup-topbar {
+				display: flex;
+			}
+
+			.popup-topbar-title {
+				font-size: 1.75em;
+				margin: 0.5em auto;
+				padding: max(1.4vmin, 0.7em) max(2vmin, 1em);
+			}
+
+			.popup-topbar-buttons {
+				position: absolute;
+				right: 0;
+				top: 0;
+				padding: max(1.4vmin, 0.7em) max(2vmin, 1em);
+			}
+
+			.popup-topbar-buttons a {
+				color: #666;
+				cursor: pointer;
+			}
+
+			.popup-content {
+				flex: 1;
+				padding: max(2vmin, 1em);
+				overflow: auto;
+				display: flex;
+				flex-direction: column;
+			}
+
+			.form-field {
+				display: flex;
+				flex-wrap: wrap;
+				margin-bottom: 0.5em;
+			}
+
+			.form-field label {
+				width: 20%;
+				min-width: 20ch;
+				margin: auto 0;
+				padding: 0.5em 0;
+			}
+
+			.form-field input {
+				flex: 1;
+				padding: 0.8em 0.9em;
+				font-size: 1.1em;
+				border: 1px solid #bbb;
+				min-width: 30ch;
+			}
+
+			.form-buttons {
+				text-align: right;
+				padding-top: 1em;
+				margin-top: auto;
+			}
+
+			.form-buttons button {
+				font-size: 1.1em;
+				cursor: pointer;
+				padding: 1em;
+				background-color: #21c87a;
+				color: #fff;
+				border: 0;
+				border-radius: 5px;
+				width: 100%;
+				box-sizing: border-box;
+			}
+
+			.form-buttons button:hover {
+				background-color: #1faf6c;
+			}
+
+			.form-buttons button:active {
+				background-color: #198854;
+			}
+		</style>
+		<script src="src/chart.js"></script>
+		<script src="src/all.min.js"></script>
+	</head>
+
+	<body>
+		<div class="main-container">
+			<div class="left-panel">
+				<div class="time-bar">
+					<div class="time-button play" id="play-button">
+						<div class="progress-bar" id="progress-bar"></div>
+					</div>
+					<div class="time-button pause" id="pause-button"></div>
+					<div class="time-text"><span id="remaining-day">0</span> Days Remaining</div>
+					<div class="time-next" id="next">
+						<i class="fas fa-step-forward"></i>
+					</div>
+				</div>
+				<div class="playground">
+					<div class="sprite warehouse" id="warehouse"></div>
+					<div class="sprite vendor" id="vendor"></div>
+					<div class="sprite truck-north" id="truck-north"></div>
+					<div class="sprite truck-east" id="truck-east"></div>
+					<div class="sprite truck-south" id="truck-south"></div>
+					<div class="sprite truck-west" id="truck-west"></div>
+				</div>
+				<div class="chart">
+					<canvas id="chart"></canvas>
+				</div>
+			</div>
+			<div class="right-panel">
+				<div class="learning-title">
+					<div>Learning policy</div>
+					<div class="setting-button" onclick="openSettings()">
+						<i class="fa-solid fa-gear"></i>
+					</div>
+				</div>
+				<table class="learning-table">
+					<thead>
+						<tr>
+							<td style="width: 30%">Choice</td>
+							<td>IE Value</td>
+						</tr>
+					</thead>
+					<tbody id="choices">
+						<tr>
+							<td>0</td>
+							<td>0</td>
+						</tr>
+						<tr>
+							<td>1</td>
+							<td>0</td>
+						</tr>
+					</tbody>
+				</table>
+				<div class="use-policy">
+					<div class="use-policy-label">Use policy:</div>
+					<div class="selectbar">
+						<label class="selectbar-option">
+							<input type="radio" value="manual" name="use-policy" />
+							Manual Policy
+						</label>
+						<label class="selectbar-option">
+							<input type="radio" value="learned" name="use-policy" checked="checked" />
+							Learned Policy
+						</label>
+					</div>
+				</div>
+				<hr />
+				<div class="summary">
+					<div class="summary-parts">
+						<div class="summary-field">
+							<div class="summary-field-title">Total units sold</div>
+							<div class="summary-field-amount" id="total-units">123</div>
+						</div>
+						<div class="summary-field">
+							<div class="summary-field-title">Total revenue</div>
+							<div class="summary-field-amount" id="total-revenue">$3164</div>
+						</div>
+						<div class="summary-field">
+							<div class="summary-field-title">Total costs</div>
+							<div class="summary-field-amount" id="total-costs">$5945</div>
+						</div>
+					</div>
+					<div class="summary-total">
+						<div class="summary-total-title">Total profit</div>
+						<div id="total-profit">$105411 - $523156 = $23212</div>
+						<div class="goal">Goal: $<span id="goal">70000</span></div>
+						<div class="goal-bar">
+							<div class="goal-progress" id="total-profit-progress"></div>
+						</div>
+					</div>
+				</div>
+
+				<div style="display: none">
+					<nav>asd</nav>
+					<div>
+						<h1>Hello World!</h1>
+						We are using Node.js <span id="node-version"></span>, Chromium
+						<span id="chrome-version"></span>, and Electron <span id="electron-version"></span>.
+					</div>
+				</div>
+			</div>
+		</div>
+		<div id="popup-wrapper" style="display: none">
+			<div class="popup" id="popup">
+				<div class="popup-topbar">
+					<div class="popup-topbar-title">Settings</div>
+					<div class="popup-topbar-buttons">
+						<a onclick="hide()"><i class="fa fa-close"></i></a>
+					</div>
+				</div>
+				<div class="popup-content">
+					<form id="popup-form">
+						<div class="form-field">
+							<label>alpha</label>
+							<input type="text" value="0.2" />
+						</div>
+					</form>
+					<div class="form-buttons">
+						<button id="confirm">Confirm</button>
+					</div>
+				</div>
+			</div>
+		</div>
+		<script>
+			let playButton = document.getElementById('play-button');
+			let pauseButton = document.getElementById('pause-button');
+			let toggleState = 1;
+
+			playButton.onclick = pauseButton.onclick = () => togglePlayPause();
+
+			let resumePlayState = () => {};
+
+			function setPlayPause(state) {
+				if (toggleState) {
+					playButton.style.display = '';
+					pauseButton.style.display = 'none';
+					resumePlayState();
+				} else {
+					playButton.style.display = 'none';
+					pauseButton.style.display = '';
+				}
+			}
+
+			function togglePlayPause() {
+				toggleState = !toggleState;
+				setPlayPause(toggleState);
+			}
+
+			function getPlayPauseState() {
+				return toggleState;
+			}
+			setPlayPause(toggleState);
+
+			function setProgress(fraction) {
+				let progressBar = document.getElementById('progress-bar');
+				let progress = Math.round(fraction * 100);
+				progressBar.style.background = `conic-gradient(rgb(3, 133, 255) ${progress}%, rgb(242, 242, 242) ${progress}%)`;
+			}
+		</script>
+		<script src="./newsvendor.js"></script>
+		<script src="./renderer.js"></script>
+		<script>
+			function updateTable(rows) {
+				let table = document.getElementById('choices');
+				table.innerHTML = '';
+				let fragment = document.createDocumentFragment();
+				for (let row of rows) {
+					let tr = document.createElement('tr');
+					for (let col of row) {
+						let td = document.createElement('td');
+						td.innerHTML = col;
+						tr.append(td);
+					}
+					fragment.append(tr);
+				}
+				table.append(fragment);
+			}
+			window.popup = function popup(form) {
+				let data = {};
+				let fragment = document.createDocumentFragment();
+				for (let field of Object.keys(form)) {
+					let fieldElement = document.createElement('div');
+					fieldElement.classList.add('form-field');
+					let label = document.createElement('label');
+					let input = document.createElement('input');
+					label.innerHTML = field;
+					input.setAttribute('type', 'text');
+					input.value = form[field];
+					fieldElement.append(label, input);
+					fragment.append(fieldElement);
+					data[field] = () => input.value;
+				}
+				let formField = document.getElementById('popup-form');
+				formField.innerHTML = '';
+				formField.appendChild(fragment);
+				return data;
+			};
+
+			function hide() {
+				let popup = document.getElementById('popup');
+				popup.parentElement.style.display = 'none';
+			}
+
+			function show() {
+				let popup = document.getElementById('popup');
+				popup.parentElement.style.display = 'block';
+			}
+
+			function run_simulation(params, theta = 0) {
+				let problem = new Newsvendor(params);
+				let iter = problem.runIter(theta);
+				return {
+					next: () => {
+						let { value, done } = iter.next();
+						return {
+							value,
+							done,
+						};
+					},
+				};
+			}
+
+			let data = popup({
+				alpha: 0.2,
+				lower: 20,
+				upper: 40,
+				bias: -4,
+				std: 2,
+				overageCost: 2,
+				underageCost: 8,
+				iterations: 60,
+				testTrial: 10,
+				thetaList: '0, 1, 2, 3, 4, 5',
+				intervalRange: '0, 10',
+				intervalStep: 1,
+				sellingPrice: 0,
+				orderCost: 0,
+				goal: 10000,
+				theta: 0,
+				time: 100,
+			});
+
+			let prevChart = null;
+			let prevHandler = null;
+
+			function openSettings() {
+				function submitSettings(data) {
+					hide();
+					if (prevHandler) {
+						clearInterval(prevHandler);
+						prevHandler = null;
+					}
+					let results = {};
+					for (let key of Object.keys(data)) {
+						let value = data[key]();
+						if (['thetaList', 'intervalRange'].includes(key)) {
+							value = value.split(',').map((elem) => +elem.trim());
+						} else {
+							value = +value;
+						}
+						results[key] = value;
+					}
+					console.log(results);
+					let { intervalRange, intervalStep } = results;
+					let mapping = {};
+					for (let value = intervalRange[0]; value <= intervalRange[1]; value += intervalStep) {
+						mapping[value] = 'N/A';
+					}
+					updateTable(Object.entries(mapping));
+
+					let controller = run_simulation(results, results.theta);
+
+					let remainingDay = document.getElementById('remaining-day');
+					let totalCosts = document.getElementById('total-costs');
+					let totalUnits = document.getElementById('total-units');
+					let totalRevenue = document.getElementById('total-revenue');
+					let totalProfit = document.getElementById('total-profit');
+					let goal = document.getElementById('goal');
+					let totalProfitProgress = document.getElementById('total-profit-progress');
+
+					goal.innerHTML = results.goal;
+					let next = document.getElementById('next');
+					let accum_units = 0;
+					let days = results.iterations;
+					remainingDay.innerHTML = days;
+					let { sellingPrice, orderCost } = results;
+
+					totalUnits.innerHTML = `0`;
+					totalRevenue.innerHTML = `$0`;
+					totalCosts.innerHTML = `$0`;
+					totalProfit.innerHTML = `$0 - $0 = $0`;
+					totalProfitProgress.style.width = `0%`;
+
+					let choiceHist = [];
+					let prevChoice = null;
+
+					let demand_history = [];
+					let order_history = [];
+
+					let chartElement = document.getElementById('chart');
+					let [chart, updateChart, destroyChart] = (function () {
+						let getLabels = () => {
+							return new Array(order_history.length).fill(0).map((elem, index) => index + 1);
+						};
+						let data = {
+							labels: getLabels(),
+							datasets: [
+								{
+									label: 'Order',
+									data: order_history,
+									borderColor: 'rgb(54, 162, 235)',
+									backgroundColor: 'rgb(54, 162, 235)',
+								},
+								{
+									label: 'Demand',
+									data: demand_history,
+									borderColor: 'rgb(255, 99, 132)',
+									backgroundColor: 'rgb(255, 99, 132)',
+								},
+							],
+						};
+
+						const config = {
+							type: 'line',
+							data: data,
+							options: {
+								maintainAspectRatio: false,
+								responsive: true,
+								interaction: {
+									mode: 'index',
+									intersect: false,
+								},
+								stacked: false,
+								plugins: {
+									title: {
+										display: true,
+										text: 'Inventory levels',
+									},
+								},
+							},
+						};
+
+						if (prevChart != null) {
+							prevChart.destroy();
+						}
+
+						let chart = new Chart(chartElement, config);
+						prevChart = chart;
+
+						let update = () => {
+							console.log(getLabels());
+							chart.data.labels = getLabels();
+							chart.data.datasets[0].data = order_history;
+							chart.data.datasets[1].data = demand_history;
+							chart.update();
+						};
+
+						let destroy = () => {
+							chart.destroy();
+						};
+						return [chart, update, destroy];
+					})();
+
+					let playProgressBar = (duration) => {
+						return new Promise((resolve, reject) => {
+							let previousTimestamp = -1;
+							let progress = 0;
+							let step = (timestamp) => {
+								let done = false;
+								progress += previousTimestamp == -1 ? 0 : (timestamp - previousTimestamp) / duration;
+								previousTimestamp = timestamp;
+								if (progress >= 1) {
+									progress = 1;
+									done = true;
+								}
+								setProgress(progress);
+								if (!done) {
+									frameId = requestAnimationFrame(step);
+								} else {
+									resolve();
+									frameId = -1;
+								}
+							};
+							let frameId = requestAnimationFrame(step);
+							let cancel = () => {
+								if (frameId != -1) {
+									cancelAnimationFrame(frameId);
+								}
+							};
+						});
+					};
+
+					let allDone = false;
+					let accum_reward_at_timestep;
+					next.style.display = '';
+					next.onclick = () => {
+						let { value, done } = controller.next();
+						console.log(value, done);
+						if (done) {
+							allDone = true;
+							next.onclick = () => {};
+							next.style.display = 'none';
+							clearInterval(handler);
+							console.log(choiceHist);
+						} else {
+							let record = value;
+							let choice = record.choice;
+							let quantity = choice.quantity;
+							mapping[quantity] = choice.getIEValue();
+							updateTable(Object.entries(mapping));
+
+							choiceHist[quantity] = (choiceHist[quantity] || 0) + 1;
+
+							demand_history.push(record.nextState.demand);
+							order_history.push(record.decision.order);
+
+							updateChart();
+
+							console.log(demand_history, order_history);
+
+							if (prevChoice) {
+								prevChoice.style.outline = '';
+							}
+							let table = document.getElementById('choices');
+							prevChoice = table.children[quantity];
+							prevChoice.style.outline = '1px solid red';
+
+							days--;
+							remainingDay.innerHTML = days;
+							accum_units += Math.min(record.decision.order, record.nextState.demand);
+							let revenue = (accum_units * sellingPrice).toFixed(1);
+							// let costs = (accum_units * orderCost).toFixed(1);
+							if (record.timestep == 100) {
+								accum_reward_at_timestep = record.accum_reward;
+							}
+							// let costs = (-record.accum_reward + accum_units * orderCost).toFixed(1);
+							// let costs = -(record.accum_reward - accum_reward_at_timestep).toFixed(1);
+							let costs = -record.accum_reward.toFixed(1);
+							let profit = revenue - costs;
+							let progress = Math.min(1, profit / results.goal) * 100;
+
+							totalUnits.innerHTML = `${accum_units}`;
+							totalRevenue.innerHTML = `$${revenue}`;
+							totalCosts.innerHTML = `$${costs}`;
+							totalProfit.innerHTML = `$${revenue} - $${costs} = $${profit}`;
+
+							totalProfitProgress.style.width = `${progress}%`;
+						}
+					};
+
+					let handler;
+
+					let resumePlayState = () => {
+						if (prevHandler) {
+							clearInterval(prevHandler);
+							prevHandler = null;
+						}
+
+						if (allDone) {
+							setProgress(1);
+						} else {
+							playProgressBar(results.time);
+						}
+
+						handler = prevHandler = setInterval(() => {
+							if (getPlayPauseState()) {
+								next.onclick();
+								if (allDone) {
+									setProgress(1);
+								} else {
+									playProgressBar(results.time).then(() => {
+										console.log('next');
+									});
+								}
+							}
+						}, results.time);
+					};
+
+					resumePlayState();
+
+					return [data, resumePlayState];
+				}
+				let confirm = document.getElementById('confirm');
+				confirm.onclick = () => ([data, resumePlayState] = submitSettings(data));
+				show();
+			}
+		</script>
+		<script>
+			let warehouse = document.getElementById('warehouse'),
+				vendor = document.getElementById('vendor'),
+				truckNorth = document.getElementById('truck-north'),
+				truckEast = document.getElementById('truck-east'),
+				truckSouth = document.getElementById('truck-south'),
+				truckWest = document.getElementById('truck-west');
+
+			let warehouseDirection = [1, 0],
+				vendorDirection = [0, 1];
+
+			const TILE_WIDTH_HALF = 25,
+				TILE_HEIGHT_HALF = TILE_WIDTH_HALF / 2;
+
+			function screenToTile(x, y) {
+				let tileX = (x / TILE_WIDTH_HALF + y / TILE_HEIGHT_HALF) / 2,
+					tileY = (y / TILE_HEIGHT_HALF - x / TILE_WIDTH_HALF) / 2;
+				return [tileX, tileY];
+			}
+
+			function planPath([finishX, finishY], [startX, startY] = [0, 0]) {
+				console.log(screenToTile(startX, startY));
+				console.log(screenToTile(finishX, finishY));
+
+				let [x, y] = screenToTile(finishX, finishY);
+				console.log(x, y);
+			}
+
+			class SparseArray {
+				constructor(defaultValue = undefined) {
+					this.elements = new Map();
+					this.defaultValue = defaultValue;
+				}
+				set(key, value) {
+					let elements = this.elements;
+					for (let i = 0; i < key.length - 1; i++) {
+						let elements = elements.get(key[i]);
+					}
+					this.elements;
+				}
+				get(key) {
+					let value = this.elements;
+					for (let index of key) {
+						if (value instanceof Map) {
+							value = value.get(index);
+						} else {
+							return this.defaultValue;
+						}
+					}
+					return value;
+				}
+			}
+
+			function toValue(a) {
+				if (typeof a == 'undefined' || a == null) return 0;
+
+				a = a.valueOf();
+				if (typeof a == 'boolean') a = a ? 1 : 0;
+				else if (typeof a == 'object') a = 1;
+				else if (typeof a == 'function') a = 1;
+				else if (typeof a == 'xml') a = 1;
+				return a;
+			}
+
+			function compare(a, b) {
+				a = toValue(a);
+				b = toValue(b);
+				if (typeof a == 'string' && typeof b == 'number') return 0;
+				if (typeof a == 'number' && typeof b == 'string') return 1;
+				return a < b;
+			}
+
+			function compareArray(a, b) {
+				if (!Array.isArray(a) || !Array.isArray(b)) return compare(a, b);
+				let len = Math.min(a.length, b.length);
+				for (let i = 0; i < len; i++) {
+					if (compareArray(a[i], b[i])) return true;
+					if (compareArray(b[i], a[i])) return false;
+					if (i + 1 == len) return a.length < b.length;
+				}
+				return false;
+			}
+
+			function mergesort(arr, cmp = compareArray, start = 0, end = arr.length) {
+				if (start + 1 == end) return arr;
+				let len = end - start,
+					half = (len / 2) | 0;
+				let left = mergesort(arr.slice(start, half)),
+					right = mergesort(arr.slice(half, end));
+				for (let i = 0, j = 0, k = 0; k < len; k++) {
+					if (i < left.length && (j >= right.length || cmp(left[i], right[j]))) {
+						arr[k] = left[i];
+						i++;
+					} else {
+						arr[k] = right[j];
+						j++;
+					}
+				}
+				return arr;
+			}
+
+			function equals(a, b) {
+				if (a === b) return true;
+				if (Array.isArray(a) && Array.isArray(b)) {
+					if (a.length != b.length) return false;
+					for (let i = 0; i < a.length; i++) {
+						if (!equals(a[i], b[i])) return false;
+					}
+					return true;
+				}
+				return false;
+			}
+
+			function binarySearchInsertion(arr, element, cmp = compareArray) {
+				let left = 0,
+					right = arr.length;
+				while (true) {
+					let middle = ((left + right) / 2) | 0;
+					if (cmp(element, arr[middle])) {
+						right = middle;
+						if (left >= right) {
+							arr.splice(right, 0, element);
+							return right;
+						}
+					} else if (cmp(arr[middle], element)) {
+						left = middle + 1;
+						if (left >= right) {
+							arr.splice(left, 0, element);
+							return left;
+						}
+					} else {
+						arr.splice(middle, 0, element);
+						return middle;
+					}
+				}
+			}
+
+			function leftRightIndexOf(arr, element, middle, cmp = compareArray, eq = equals) {
+				for (let i = middle; i >= 0; i--) {
+					if (eq(arr[i], element)) return i;
+					if (cmp(arr[i], element)) break;
+				}
+				for (let i = middle + 1; i < arr.length; i++) {
+					if (eq(arr[i], element)) return i;
+					if (cmp(element, arr[i])) break;
+				}
+				return -1;
+			}
+
+			function binarySearchIndexOf(arr, element, cmp = compareArray, eq = equals) {
+				let left = 0,
+					right = arr.length;
+				while (left < right) {
+					let middle = ((left + right) / 2) | 0;
+					if (cmp(element, arr[middle])) {
+						right = middle;
+					} else if (cmp(arr[middle], element)) {
+						left = middle + 1;
+					} else {
+						return leftRightIndexOf(arr, element, middle, cmp, eq);
+					}
+				}
+				return -1;
+			}
+
+			class TupleMap {
+				#keys;
+				#values;
+
+				constructor() {
+					this.#keys = [];
+					this.#values = [];
+				}
+
+				indexOf(key) {
+					return binarySearchIndexOf(this.#keys, key);
+				}
+
+				get size() {
+					return this.#keys.length;
+				}
+
+				*[Symbol.iterator]() {
+					for (let i = 0; i < this.#keys.length; i++) {
+						yield [this.#keys[i], this.#values[i]];
+					}
+				}
+
+				clear() {
+					this.#keys.length = 0;
+					this.#values.length = 0;
+				}
+
+				delete(key) {
+					let index = this.indexOf(key);
+					if (index == -1) return false;
+					this.#keys.splice(index, 1);
+					this.#values.splice(index, 1);
+					return true;
+				}
+
+				entries() {
+					return this[Symbol.iterator]();
+				}
+
+				forEach(callback, thisArg = this) {
+					for (let [key, value] of this.entries()) {
+						callback.call(thisArg, value, key, this);
+					}
+				}
+
+				get(key) {
+					let index = this.indexOf(key);
+					if (index == -1) return undefined;
+					return this.#values[index];
+				}
+
+				has(key) {
+					return this.indexOf(key) != -1;
+				}
+
+				keys() {
+					return this.#keys[Symbol.iterator]();
+				}
+
+				set(key, value) {
+					let index = this.indexOf(key);
+					if (index == -1) {
+						this.#keys.push(key);
+						this.#values.push(value);
+					} else {
+						this.#values[index] = value;
+					}
+					return this;
+				}
+
+				values() {
+					return this.#values[Symbol.iterator]();
+				}
+			}
+
+			console.log(mergesort([1, 'asd', null, {}, function () {}, 99, 'ok', -1, true]));
+			console.log(true);
+			let arr = mergesort([[1, 9, 8], [1, 5, 2], [2], [1, 5], [1, 5, -2]]);
+			console.log(arr);
+			arr = arr.slice();
+			binarySearchInsertion(arr, [1, 5, -10]);
+			binarySearchInsertion(arr, [1, 5, -1]);
+			binarySearchInsertion(arr, [1, 5, 9]);
+			binarySearchInsertion(arr, [1, 5, 3]);
+			console.log(arr);
+
+			let sparseArray = new TupleMap();
+			sparseArray.set([0, 1], true);
+			sparseArray.set([0, 2], true);
+			sparseArray.set([0, 2], -99);
+			for (let [key, value] of sparseArray) {
+				console.log(key, value);
+			}
+
+			planPath([vendor.offsetLeft - warehouse.offsetLeft, vendor.offsetTop - warehouse.offsetTop]);
+		</script>
+	</body>
 </html>
