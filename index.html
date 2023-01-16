@@ -124,6 +124,7 @@
 				flex: 1;
 				position: relative;
 				min-height: 150px;
+				overflow: hidden;
 			}
 
 			.chart {
@@ -152,34 +153,34 @@
 			.sprite.truck-north {
 				transform: scaleX(1);
 				background-image: url('imgs/back.png');
-				top: 0%;
+				top: 0;
 				right: 0;
 			}
 
 			.sprite.truck-east {
 				transform: scaleX(-1);
 				background-image: url('imgs/front.png');
-				top: 20%;
+				top: 7.5vmin;
 				right: 0;
 			}
 
 			.sprite.truck-south {
 				transform: scaleX(1);
 				background-image: url('imgs/front.png');
-				top: 40%;
+				top: 15vmin;
 				right: 0;
 			}
 
 			.sprite.truck-west {
 				transform: scaleX(-1);
 				background-image: url('imgs/back.png');
-				top: 60%;
+				top: 22.5vmin;
 				right: 0;
 			}
 
 			.sprite.warehouse {
-				bottom: 20%;
-				left: 15%;
+				left: 0;
+				top: 0;
 				background-image: url('imgs/warehouse.png');
 				background-size: 140%;
 				width: 15vmin;
@@ -187,8 +188,8 @@
 			}
 
 			.sprite.vendor {
-				top: 20%;
-				right: 15%;
+				left: 0;
+				top: 15vmin;
 				background-image: url('imgs/vendor.png');
 				width: 15vmin;
 				min-width: 50px;
@@ -434,7 +435,7 @@
 						<i class="fas fa-step-forward"></i>
 					</div>
 				</div>
-				<div class="playground">
+				<div class="playground" id="playground">
 					<div class="sprite warehouse" id="warehouse"></div>
 					<div class="sprite vendor" id="vendor"></div>
 					<div class="sprite truck-north" id="truck-north"></div>
@@ -906,7 +907,8 @@
 			}
 		</script>
 		<script>
-			let warehouse = document.getElementById('warehouse'),
+			let playground = document.getElementById('playground'),
+				warehouse = document.getElementById('warehouse'),
 				vendor = document.getElementById('vendor'),
 				truckNorth = document.getElementById('truck-north'),
 				truckEast = document.getElementById('truck-east'),
@@ -931,31 +933,6 @@
 
 				let [x, y] = screenToTile(finishX, finishY);
 				console.log(x, y);
-			}
-
-			class SparseArray {
-				constructor(defaultValue = undefined) {
-					this.elements = new Map();
-					this.defaultValue = defaultValue;
-				}
-				set(key, value) {
-					let elements = this.elements;
-					for (let i = 0; i < key.length - 1; i++) {
-						let elements = elements.get(key[i]);
-					}
-					this.elements;
-				}
-				get(key) {
-					let value = this.elements;
-					for (let index of key) {
-						if (value instanceof Map) {
-							value = value.get(index);
-						} else {
-							return this.defaultValue;
-						}
-					}
-					return value;
-				}
 			}
 
 			function toValue(a) {
@@ -1073,10 +1050,12 @@
 			class TupleMap {
 				#keys;
 				#values;
+				#defaultValue;
 
-				constructor() {
+				constructor(defaultValue = undefined) {
 					this.#keys = [];
 					this.#values = [];
+					this.#defaultValue = defaultValue;
 				}
 
 				indexOf(key) {
@@ -1118,7 +1097,7 @@
 
 				get(key) {
 					let index = this.indexOf(key);
-					if (index == -1) return undefined;
+					if (index == -1) return this.#defaultValue;
 					return this.#values[index];
 				}
 
@@ -1133,8 +1112,8 @@
 				set(key, value) {
 					let index = this.indexOf(key);
 					if (index == -1) {
-						this.#keys.push(key);
-						this.#values.push(value);
+						let index = binarySearchInsertion(this.#keys, key);
+						this.#values.splice(index, 0, value);
 					} else {
 						this.#values[index] = value;
 					}
@@ -1143,6 +1122,197 @@
 
 				values() {
 					return this.#values[Symbol.iterator]();
+				}
+			}
+
+			class GridSystem {
+				#TILE_WIDTH_HALF = 0;
+				#TILE_HEIGHT_HALF = 0;
+				#maps;
+				#observer;
+
+				constructor(onBeforeUpdate) {
+					this.#maps = new TupleMap();
+					this.#observer = new ResizeObserver(() => {
+						if (onBeforeUpdate) onBeforeUpdate(this);
+						this.update(playground);
+					});
+				}
+
+				setGridSize(width, height = width / 2) {
+					this.#TILE_WIDTH_HALF = width / 2;
+					this.#TILE_HEIGHT_HALF = height / 2;
+					return this;
+				}
+
+				setEntity(coords, entity) {
+					this.#maps.set(coords, entity);
+				}
+
+				getEntity(coords) {
+					return this.#maps.get(coords);
+				}
+
+				getPosition(coords) {
+					let [gridX, gridY] = coords;
+					let x = (gridX - gridY) * this.#TILE_WIDTH_HALF;
+					let y = (gridX + gridY) * this.#TILE_HEIGHT_HALF;
+					return [x, y];
+				}
+
+				getGridPosition(coords) {
+					let [x, y] = coords;
+					let tileX = (x / this.#TILE_WIDTH_HALF + y / this.#TILE_HEIGHT_HALF) / 2,
+						tileY = (y / this.#TILE_HEIGHT_HALF + x / this.#TILE_WIDTH_HALF) / 2;
+					return [tileX, tileY];
+				}
+
+				getGridBound(width, height, center = [width / 2, height / 2]) {
+					let [centerX, centerY] = center;
+					let top = -centerY,
+						bottom = centerY,
+						left = -centerX,
+						right = centerX;
+					let [gridLeft, gridTop] = this.getGridPosition([left, top]);
+					let [gridRight, gridBottom] = this.getGridPosition([right, bottom]);
+
+					let bound = (n) => Math.sign(n) * Math.ceil(Math.abs(n));
+
+					gridLeft = bound(gridLeft);
+					gridTop = bound(gridTop);
+					gridRight = bound(gridRight);
+					gridBottom = bound(gridBottom);
+
+					return [gridLeft, gridRight, gridTop, gridBottom];
+				}
+
+				update(playground, autoUpdate = false) {
+					if (autoUpdate) {
+						this.#observer.observe(playground);
+					}
+					let [gridLeft, gridRight, gridTop, gridBottom] = this.getGridBound(
+						playground.offsetWidth,
+						playground.offsetHeight
+					);
+
+					let [centerX, centerY] = [playground.offsetWidth / 2, playground.offsetHeight / 2];
+
+					let add = ([x1, y1], [x2, y2]) => [x1 + x2, y1 + y2];
+
+					for (let x = gridLeft; x <= gridRight; x++) {
+						for (let y = gridTop; y <= gridBottom; y++) {
+							let position = add(this.getPosition([x, y]), [centerX, centerY]);
+							let entity = this.getEntity([x, y]);
+							if (entity) {
+								// console.log(entity);
+								let [positionX, positionY] = position;
+								positionX -= entity.offsetWidth / 2;
+								positionY -= entity.offsetHeight / 2;
+								entity.style.left = Math.round(positionX) + 'px';
+								entity.style.top = Math.round(positionY) + 'px';
+								// console.log('grid coords:', [x, y], position, [entity.style.left, entity.style.top]);
+							}
+						}
+					}
+
+					// console.log('[centerX, centerY]', [centerX, centerY]);
+				}
+
+				getMap(border = 1) {
+					let [minX, minY] = [Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER],
+						[maxX, maxY] = [Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER];
+
+					for (let [key, value] of this.#maps) {
+						let [x, y] = key;
+						[minX, minY] = [Math.min(minX, x), Math.min(minY, y)];
+						[maxX, maxY] = [Math.max(maxX, x), Math.max(maxY, y)];
+					}
+
+					minX -= border;
+					minY -= border;
+					maxX += border;
+					maxY += border;
+
+					let map = [];
+					for (let x = minX; x <= maxX; x++) {
+						let row = [];
+						for (let y = minY; y <= maxY; y++) {
+							let position = [x, y],
+								entity = this.getEntity(position);
+
+							row.push([position, entity]);
+						}
+						map.push(row);
+					}
+
+					return map;
+				}
+
+				shortestPath(from, to) {
+					let add = ([x1, y1], [x2, y2]) => [x1 + x2, y1 + y2];
+					let sub = ([x1, y1], [x2, y2]) => [x1 - x2, y1 - y2];
+
+					let map = this.getMap();
+					let M = map.length,
+						N = map[0].length;
+
+					let topLeft = map[0][0][0];
+					from = sub(from, topLeft);
+					to = sub(to, topLeft);
+
+					// console.log(from, to);
+
+					let bfs = (from, to, map, M, N) => {
+						let stack = [];
+						let visited = [];
+						let prev = [];
+
+						stack.push(from);
+						while (stack.length > 0) {
+							let node = stack.shift();
+							let [x, y] = node;
+
+							if (x == to[0] && y == to[1]) {
+								break;
+							}
+
+							if (x > 0 && !visited[(x - 1) * N + y] && !map[x - 1][y][1]) {
+								stack.push([x - 1, y]);
+								visited[(x - 1) * N + y] = true;
+								prev[(x - 1) * N + y] = node;
+							}
+							if (x < M - 1 && !visited[(x + 1) * N + y] && !map[x + 1][y][1]) {
+								stack.push([x + 1, y]);
+								visited[(x + 1) * N + y] = true;
+								prev[(x + 1) * N + y] = node;
+							}
+							if (y > 0 && !visited[x * N + (y - 1)] && !map[x][y - 1][1]) {
+								stack.push([x, y - 1]);
+								visited[x * N + (y - 1)] = true;
+								prev[x * N + (y - 1)] = node;
+							}
+							if (y < N - 1 && !visited[x * N + (y + 1)] && !map[x][y + 1][1]) {
+								stack.push([x, y + 1]);
+								visited[x * N + (y + 1)] = true;
+								prev[x * N + (y + 1)] = node;
+							}
+						}
+
+						let node = to;
+						let path = [node];
+
+						while (true) {
+							// console.log(prev, node);
+							let [x, y] = node;
+							if (x == from[0] && y == from[1]) break;
+							node = prev[x * N + y];
+							path.push(node);
+						}
+
+						return path.reverse();
+					};
+
+					return bfs(from, to, map, M, N).map(([i, j]) => map[i][j]);
 				}
 			}
 
@@ -1157,13 +1327,107 @@
 			binarySearchInsertion(arr, [1, 5, 3]);
 			console.log(arr);
 
-			let sparseArray = new TupleMap();
+			let sparseArray = new TupleMap(0);
+			sparseArray.set([0, 0], 'wtf');
 			sparseArray.set([0, 1], true);
 			sparseArray.set([0, 2], true);
 			sparseArray.set([0, 2], -99);
 			for (let [key, value] of sparseArray) {
 				console.log(key, value);
 			}
+			console.log(sparseArray.get([0, 99]));
+
+			let gridSystem = new GridSystem(function (self) {
+				self.setGridSize(warehouse.offsetWidth);
+			});
+			gridSystem.setGridSize(warehouse.offsetWidth);
+			gridSystem.setEntity([0, 2], warehouse);
+			gridSystem.setEntity([0, -2], vendor);
+
+			console.log('GridSystem', gridSystem.getPosition([-2, -1]));
+			gridSystem.update(playground, true);
+			console.log(gridSystem);
+
+			console.log(gridSystem.getMap());
+			let add = ([x1, y1], [x2, y2]) => [x1 + x2, y1 + y2];
+			console.log(
+				'shortestPath',
+				gridSystem.shortestPath(add([0, 2], warehouseDirection), add([0, -2], vendorDirection))
+			);
+
+			let animate = (start = {}, end = {}, duration = 1000, playNow = true) => {
+				let progress = 0;
+				let prevTimestamp = -1;
+				let frameId = -1;
+				let render = (progress) => {
+					console.log(progress);
+				};
+				let step = (timestamp) => {
+					if (prevTimestamp != -1) progress = Math.min(1, progress + (timestamp - prevTimestamp) / duration);
+					prevTimestamp = timestamp;
+					if (progress == 1) {
+						handler.finish();
+					} else {
+						render(progress);
+						frameId = requestAnimationFrame(step);
+					}
+				};
+
+				let onFinish, onStop;
+
+				const handler = {
+					finish() {
+						progress = 1;
+						this.pause();
+						render(progress);
+						onFinish?.(handler);
+						return this;
+					},
+					play() {
+						if (frameId == -1) frameId = requestAnimationFrame(step);
+						return this;
+					},
+					pause() {
+						if (frameId != -1) cancelAnimationFrame(frameId);
+						prevTimestamp = -1;
+						frameId = -1;
+						return this;
+					},
+					stop() {
+						progress = 0;
+						this.pause();
+						render(progress);
+						onStop?.(handler);
+						return this;
+					},
+				};
+
+				const thenable = Object.create(handler);
+				thenable.then = function (resolve, reject) {
+					onFinish = resolve;
+					onStop = reject;
+				};
+
+				if (playNow) handler.play();
+
+				return thenable;
+			};
+
+			console.log(
+				Promise.resolve(animate()).then(
+					function (handler, nothing) {
+						console.log('args', handler, nothing);
+					},
+					() => {
+						console.log('stopped');
+					}
+				)
+			);
+
+			// window.addEventListener('resize', () => {
+			// 	gridSystem.setGridSize(warehouse.offsetWidth);
+			// 	gridSystem.update(playground);
+			// });
 
 			planPath([vendor.offsetLeft - warehouse.offsetLeft, vendor.offsetTop - warehouse.offsetTop]);
 		</script>
