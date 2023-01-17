@@ -1,5 +1,5 @@
 'use strict';
-window.Newsvendor = (function() {
+window.Newsvendor = (function () {
     var randint = (min, max) => Math.floor(Math.random() * (max - min)) + min;
     var gaussianRandom = (mean = 0, stdev = 1) => {
         let u = 1 - Math.random();
@@ -83,6 +83,14 @@ window.Newsvendor = (function() {
             return { reward: this.reward_fn(this.state, decision), decision };
         }
 
+        stepManual(decision) {
+            this.n++;
+            let state = { bias: this.state.bias };
+            this.update(this.transition_fn(this.state));
+            state.estimate = this.state.estimate;
+            return { reward: this.reward_fn(this.state, decision), decision };
+        }
+
         getDecision(state, action) {
             let { theta } = action;
             let { estimate, bias } = state;
@@ -162,10 +170,10 @@ window.Newsvendor = (function() {
         constructor(params) {
             this.params = params;
             this.env = new Model(params);
+            this.manualPolicy = null;
         }
 
-        *
-        runIter(theta, verbose = false) {
+        *runIter(theta, verbose = false) {
             let params = this.params;
             let agent = new LearningAgent(params, theta);
             let env = this.env;
@@ -189,6 +197,21 @@ window.Newsvendor = (function() {
                 record.timestep = t;
                 record.state = env.state;
                 record.action = action;
+
+                if (this.manualPolicy) {
+                    let { reward, decision } = env.stepManual(this.manualPolicy);
+                    record.decision = decision;
+                    record.reward = reward;
+                    record.nextState = env.state;
+
+                    accum_reward += reward;
+                    record.accum_reward = accum_reward;
+
+                    if (verbose) console.log(record);
+
+                    yield record;
+                    continue;
+                }
 
                 let { reward, decision } = env.step(action);
                 record.decision = decision;
@@ -226,7 +249,7 @@ window.Newsvendor = (function() {
                 let trialResults = [];
                 for (let trial = 0; trial < testTrial; trial++) {
 
-                    let history = this.run(theta, true);
+                    let history = this.run(theta, false);
                     let result = {
                         params: { theta },
                         accum_reward: history[history.length - 1].accum_reward,
@@ -271,7 +294,7 @@ window.Newsvendor = (function() {
     // problem.run(1);
 
     // grid search
-    console.log(problem.policySearch());
+    // console.log(problem.policySearch());
 
     // https://terrorgum.com/tfox/books/learninginembeddedsystems.pdf
 
