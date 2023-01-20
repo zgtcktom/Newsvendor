@@ -4,13 +4,23 @@
 		<title>test</title>
 		<style>
 			.playground {
+				position: relative;
 				width: 100vw;
 				height: 100vw;
+			}
+
+			.item {
+				position: absolute;
+				width: 100px;
+				height: 100px;
+				background: rgb(253, 159, 159);
 			}
 		</style>
 	</head>
 	<body>
-		<div class="playground"></div>
+		<div class="playground">
+			<div class="item" id="item"></div>
+		</div>
 		<script src="test.js"></script>
 	</body>
 </html>
