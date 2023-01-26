@@ -309,11 +309,37 @@ window.onload = () => setTimeout(function () {
     };
 
     class Color {
+        static convert(sourceType, targetType, sourceColor, targetColor) {
+            return convert[sourceType]?.[targetType]?.(sourceColor, targetColor);
+        }
+
+        static hint(color) {
+            {
+                let { r, g, b } = color;
+                if (r != null && g != null && b != null) return 'rgb';
+            };
+            {
+                let { h, s, l } = color;
+                if (h != null && s != null && l != null) return 'hsl';
+            };
+            {
+                let { h, s, v } = color;
+                if (h != null && s != null && v != null) return 'hsv';
+            };
+        }
+
         static EPSILON = 1e-10;
 
-        type = '';
+        type = null;
 
-        constructor() { }
+        constructor(channels, type) {
+            if (channels) {
+                Object.assign(this, channels);
+            }
+            if (type) {
+                this.type = type;
+            }
+        }
 
         *[Symbol.iterator]() { }
 
@@ -332,6 +358,11 @@ window.onload = () => setTimeout(function () {
                 return true;
             }
             return this.toRGBA().equals(other.toRGBA());
+        }
+
+        to(type) {
+            // console.log(convert[this.type]?.[type]);
+            return Color.convert(this.type, type, this, ColorConstructors[type] ? new ColorConstructors[type] : new Color(null, type));
         }
     }
     // color conversion formula found in: 
@@ -367,44 +398,6 @@ window.onload = () => setTimeout(function () {
                 return `rgb(${r}, ${g}, ${b})`;
             return `rgb(${r}, ${g}, ${b}, ${a})`;
         }
-
-        toRGB() {
-            let { r, g, b, a } = this;
-            return new RGBColor(r, g, b, a);
-        }
-
-        toRGBA() {
-            let { r, g, b } = this;
-            return new RGBAColor(r, g, b, 1);
-        }
-
-        toHSL() {
-            let { r, g, b, a } = this;
-            r /= 255;
-            g /= 255;
-            b /= 255;
-            let min = Math.min(r, g, b);
-            let max = Math.max(r, g, b);
-            let h, s, l = max * 0.5 + min * 0.5;
-            if (max == min) {
-                h = s = 0;
-            } else {
-                let d = max - min;
-                s = l < 0.5 ? d / (max + min) : d / (2 - max - min);
-                if (max == r)
-                    h = (g - b) / d + (g < b ? 6 : 0);
-                else if (max == g)
-                    h = (b - r) / d + 2;
-                else if (max == b)
-                    h = (r - g) / d + 4;
-                h = h * 60;
-            }
-            return new HSLColor(h, s, l, a);
-        }
-
-        toHSV() {
-            return this.toHSL().toHSV();
-        }
     }
 
     console.log(new RGBColor(1, 2, 3).clone());
@@ -437,20 +430,7 @@ window.onload = () => setTimeout(function () {
             let { r, g, b, a } = this;
             return `rgba(${r}, ${g}, ${b}, ${a})`;
         }
-
-        toRGBA() {
-            return this.clone();
-        }
     }
-
-    let hue2rgb = (p, q, t) => {
-        if (t < 0) t += 1;
-        if (t > 1) t -= 1;
-        if (t * 6 < 1) return p + (q - p) * 6 * t;
-        if (t * 2 < 1) return q;
-        if (t * 3 < 2) return p + (q - p) * (2 / 3 - t) * 6;
-        return p;
-    };
 
     class HSLColor extends Color {
         type = 'hsl';
@@ -479,31 +459,6 @@ window.onload = () => setTimeout(function () {
 
             return `hsl(${h}, ${s * 100}%, ${l * 100}%, ${a})`;
         }
-
-        toRGB() {
-            let { h, s, l, a } = this;
-            let r, g, b;
-
-            if (s == 0)
-                r = g = b = l;
-            else {
-                h /= 360;
-                let q = l < 0.5 ? l * (1 + s) : l + s - s * l;
-                let p = 2 * l - q;
-                r = hue2rgb(p, q, h + 1 / 3);
-                g = hue2rgb(p, q, h);
-                b = hue2rgb(p, q, h - 1 / 3);
-            }
-
-            return new RGBColor(r * 255, g * 255, b * 255, a);
-        }
-
-        toHSV() {
-            let { h, s, l, a } = this;
-            let v = l + s * Math.min(l, 1 - l);
-            s = v == 0 ? 0 : 2 * (1 - l / v);
-            return new HSVColor(h, s, v, a);
-        }
     }
 
     class HSVColor extends Color {
@@ -525,27 +480,7 @@ window.onload = () => setTimeout(function () {
 
             return `hsv(${h}, ${s * 100}%, ${v * 100}%, ${a})`;
         }
-
-        toHSV() {
-            let { h, s, v, a } = this;
-            return new HSVColor(h, s, v, a);
-        }
-
-        toHSL() {
-            let { h, s, v, a } = this;
-            let l = v * (1 - s / 2);
-            s = l == 0 || l == 1 ? 0 : (v - l) / Math.min(l, 1 - l);
-            return new HSLColor(h, s, l, a);
-        }
-
-        toRGB() {
-            return this.toHSL().toRGB();
-        }
     }
-
-    console.log('HSVColor:', new HSVColor(234, .42, .86).toRGB().toHSV() + '');
-
-    console.log('HSLColor:', new HSLColor(123, .28, .61).toRGB().toHSL() + '');
 
     class HWBColor extends Color {
         type = 'hwb';
@@ -566,36 +501,120 @@ window.onload = () => setTimeout(function () {
 
             return `hwb(${h}, ${w * 100}%, ${b * 100}%, ${a})`;
         }
-
-        toHWB() {
-            let { h, w, b, a } = this;
-            return new HWBColor(h, w, b, a);
-        }
-
-        toHSV() {
-            let { h, w, b, a } = this;
-
-            let sum = w + b;
-            if (sum > 1) {
-                w /= sum;
-                b /= sum;
-            }
-
-            let s = 1 - w / (1 - b);
-            let v = 1 - b;
-            return new HSVColor(h, s, v, a);
-        }
-
-        toHSL() {
-            return this.toHSV().toHSL();
-        }
-
-        toRGB() {
-            return this.toHSL().toRGB();
-        }
     }
 
-    console.log('HWBColor:', new HWBColor(173, .22, .43).toRGB() + '');
+    let ColorConstructors = {
+        rgb: RGBColor,
+        hsl: HSLColor,
+        hwb: HWBColor,
+        hsv: HSVColor,
+    };
+
+    let rgb2hsl = (rgb, hsl = {}) => {
+        let { r, g, b, a } = rgb;
+
+        r /= 255;
+        g /= 255;
+        b /= 255;
+        let min = Math.min(r, g, b);
+        let max = Math.max(r, g, b);
+        let h, s, l = max * 0.5 + min * 0.5;
+        if (max == min) {
+            h = s = 0;
+        } else {
+            let d = max - min;
+            s = l < 0.5 ? d / (max + min) : d / (2 - max - min);
+            if (max == r)
+                h = (g - b) / d + (g < b ? 6 : 0);
+            else if (max == g)
+                h = (b - r) / d + 2;
+            else if (max == b)
+                h = (r - g) / d + 4;
+            h = h * 60;
+        }
+
+        hsl.h = h; hsl.s = s; hsl.l = l; hsl.a = a;
+        return hsl;
+    };
+
+    let hue2rgb = (p, q, t) => {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t * 6 < 1) return p + (q - p) * 6 * t;
+        if (t * 2 < 1) return q;
+        if (t * 3 < 2) return p + (q - p) * (2 / 3 - t) * 6;
+        return p;
+    };
+
+    let hsl2rgb = (hsl, rgb = {}) => {
+        let { h, s, l, a } = hsl;
+
+        let r, g, b;
+
+        if (s == 0)
+            r = g = b = l;
+        else {
+            h /= 360;
+            let q = l < 0.5 ? l * (1 + s) : l + s - s * l;
+            let p = 2 * l - q;
+            r = hue2rgb(p, q, h + 1 / 3);
+            g = hue2rgb(p, q, h);
+            b = hue2rgb(p, q, h - 1 / 3);
+        }
+
+        r *= 255;
+        g *= 255;
+        b *= 255;
+
+        rgb.r = r; rgb.g = g; rgb.b = b; rgb.a = a;
+        return rgb;
+    };
+
+    let hsl2hsv = (hsl, hsv = {}) => {
+        let { h, s, l, a } = hsl;
+
+        let v = l + s * Math.min(l, 1 - l);
+        s = v == 0 ? 0 : 2 * (1 - l / v);
+
+        hsv.h = h; hsv.s = s; hsv.v = v; hsv.a = a;
+        return hsv;
+    };
+
+    let hsv2hsl = (hsv, hsl = {}) => {
+        let { h, s, v, a } = hsv;
+
+        let l = v * (1 - s / 2);
+        s = l == 0 || l == 1 ? 0 : (v - l) / Math.min(l, 1 - l);
+
+        hsl.h = h; hsl.s = s; hsl.l = l; hsl.a = a;
+        return hsl;
+    };
+
+    let hwb2hsv = (hwb, hsv = {}) => {
+        let { h, w, b, a } = hwb;
+
+        let sum = w + b;
+        if (sum > 1) {
+            w /= sum;
+            b /= sum;
+        }
+
+        let s = 1 - w / (1 - b);
+        let v = 1 - b;
+
+        hsv.h = h; hsv.s = s; hsv.v = v; hsv.a = a;
+        return hsv;
+    };
+
+    let hsv2hwb = (hsv, hwb = {}) => {
+        let { h, s, v, a } = hsv;
+
+        let w = (1 - s) * v;
+        let b = 1 - v;
+
+        hwb.h = h; hwb.w = w; hwb.b = b; hwb.a = a;
+        return hwb;
+    };
 
     let rgbGamma = x => x > 0.04045 ? ((x + 0.055) / 1.055) ** 2.4 : x / 12.92;
     let rgb2xyz = (rgb, xyz = {}) => {
@@ -613,7 +632,7 @@ window.onload = () => setTimeout(function () {
         return xyz;
     };
 
-    console.log('rgb2xyz:', rgb2xyz({ r: 123, g: 4, b: 255, a: 1 }));
+    // console.log('rgb2xyz:', rgb2xyz({ r: 123, g: 4, b: 255, a: 1 }));
 
     let xyzGamma = x => x > 0.0031308 ? 1.055 * x ** (1 / 2.4) - 0.055 : 12.92 * x;
     let xyz2rgb = (xyz, rgb = {}) => {
@@ -631,7 +650,7 @@ window.onload = () => setTimeout(function () {
         return rgb;
     };
 
-    console.log('xyz2rgb:', xyz2rgb(rgb2xyz({ r: 123, g: 4, b: 255, a: 1 })));
+    // console.log('xyz2rgb:', xyz2rgb(rgb2xyz({ r: 123, g: 4, b: 255, a: 1 })));
 
     // Observer = 2°, Illuminant = D65
     let xRef = 0.950456, yRef = 1.000000, zRef = 1.088754;
@@ -652,7 +671,7 @@ window.onload = () => setTimeout(function () {
         return lab;
     };
 
-    console.log('xyz2lab:', xyz2lab(rgb2xyz({ r: 15, g: 96, b: 32, a: 1 })));
+    // console.log('xyz2lab:', xyz2lab(rgb2xyz({ r: 15, g: 96, b: 32, a: 1 })));
 
     let lab2xyz = (lab, xyz = {}) => {
         let { l, a, b, alpha } = lab;
@@ -669,7 +688,7 @@ window.onload = () => setTimeout(function () {
         return xyz;
     };
 
-    console.log('xyz2lab:', xyz2rgb(lab2xyz(xyz2lab(rgb2xyz({ r: 15, g: 96, b: 32, a: 1 })))));
+    // console.log('xyz2lab:', xyz2rgb(lab2xyz(xyz2lab(rgb2xyz({ r: 15, g: 96, b: 32, a: 1 })))));
 
     let lab2lch = (lab, lch = {}) => {
         let { l, a, b, alpha } = lab;
@@ -683,7 +702,7 @@ window.onload = () => setTimeout(function () {
         return lch;
     };
 
-    console.log('lab2lch:', lab2lch(xyz2lab(rgb2xyz({ r: 34, g: 64, b: 129, a: 1 }))));
+    // console.log('lab2lch:', lab2lch(xyz2lab(rgb2xyz({ r: 34, g: 64, b: 129, a: 1 }))));
 
     let lch2lab = (lch, lab = {}) => {
         let { l, c, h, a: alpha } = lch;
@@ -695,7 +714,7 @@ window.onload = () => setTimeout(function () {
         return lab;
     };
 
-    console.log('lch2lab:', xyz2rgb(lab2xyz(lch2lab(lab2lch(xyz2lab(rgb2xyz({ r: 34, g: 64, b: 129, a: 1 })))))));
+    // console.log('lch2lab:', xyz2rgb(lab2xyz(lch2lab(lab2lch(xyz2lab(rgb2xyz({ r: 34, g: 64, b: 129, a: 1 })))))));
 
     let rgb2cmy = (rgb, cmy = {}) => {
         let { r, g, b, a } = rgb;
@@ -708,7 +727,7 @@ window.onload = () => setTimeout(function () {
         return cmy;
     };
 
-    console.log('rgb2cmy:', rgb2cmy({ r: 82, g: 43, b: 119, a: 1 }));
+    // console.log('rgb2cmy:', rgb2cmy({ r: 82, g: 43, b: 119, a: 1 }));
 
     let cmy2rgb = (cmy, rgb = {}) => {
         let { c, m, y, a } = cmy;
@@ -721,7 +740,7 @@ window.onload = () => setTimeout(function () {
         return rgb;
     };
 
-    console.log('cmy2rgb:', cmy2rgb(rgb2cmy({ r: 82, g: 43, b: 119, a: 1 })));
+    // console.log('cmy2rgb:', cmy2rgb(rgb2cmy({ r: 82, g: 43, b: 119, a: 1 })));
 
     let cmy2cmyk = (cmy, cmyk = {}) => {
         let { c, m, y, a } = cmy;
@@ -740,7 +759,7 @@ window.onload = () => setTimeout(function () {
         return cmyk;
     };
 
-    console.log('cmy2cmyk:', cmy2cmyk(rgb2cmy({ r: 82, g: 43, b: 119, a: 1 })));
+    // console.log('cmy2cmyk:', cmy2cmyk(rgb2cmy({ r: 82, g: 43, b: 119, a: 1 })));
 
     let cmyk2cmy = (cmyk, cmy = {}) => {
         let { c, m, y, k, a } = cmyk;
@@ -753,13 +772,145 @@ window.onload = () => setTimeout(function () {
         return cmy;
     };
 
-    console.log('cmyk2cmy:', cmy2rgb(cmyk2cmy(cmy2cmyk(rgb2cmy({ r: 82, g: 43, b: 119, a: 1 })))));
+    // console.log('cmyk2cmy:', cmy2rgb(cmyk2cmy(cmy2cmyk(rgb2cmy({ r: 82, g: 43, b: 119, a: 1 })))));
+
+    let ident = (color, target = {}) => Object.assign(target, color);
+
+    let convert = {
+        rgb: {
+            rgb: ident,
+            hsl: rgb2hsl,
+            hsv: (rgb, hsv) => hsl2hsv(rgb2hsl(rgb), hsv),
+            hwb: (rgb, hwb) => hsv2hwb(hsl2hsv(rgb2hsl(rgb)), hwb),
+            xyz: rgb2xyz,
+            lab: (rgb, lab) => xyz2lab(rgb2xyz(rgb), lab),
+            lch: (rgb, lch) => lab2lch(xyz2lab(rgb2xyz(rgb)), lch),
+            cmy: rgb2cmy,
+            cmyk: (rgb, cmyk) => cmy2cmyk(rgb2cmy(rgb), cmyk),
+        },
+        hsl: {
+            rgb: hsl2rgb,
+            hsl: ident,
+            hsv: (hsl, hsv) => hsl2hsv(hsl, hsv),
+            hwb: (hsl, hwb) => hsv2hwb(hsl2hsv(hsl), hwb),
+            xyz: (hsl, xyz) => rgb2xyz(hsl2rgb(hsl), xyz),
+            lab: (hsl, lab) => xyz2lab(rgb2xyz(hsl2rgb(hsl)), lab),
+            lch: (hsl, lch) => lab2lch(xyz2lab(rgb2xyz(hsl2rgb(hsl))), lch),
+            cmy: (hsl, cmy) => rgb2cmy(hsl2rgb(hsl), cmy),
+            cmyk: (hsl, cmyk) => cmy2cmyk(rgb2cmy(hsl2rgb(hsl)), cmyk),
+        },
+        hsv: {
+            rgb: (hsv, rgb) => hsl2rgb(hsv2hsl(hsv), rgb),
+            hsl: hsv2hsl,
+            hsv: ident,
+            hwb: (hsv, hwb) => hsv2hwb(hsv, hwb),
+            xyz: (hsv, xyz) => rgb2xyz(hsl2rgb(hsv2hsl(hsv)), xyz),
+            lab: (hsv, lab) => xyz2lab(rgb2xyz(hsl2rgb(hsv2hsl(hsv))), lab),
+            lch: (hsv, lch) => lab2lch(xyz2lab(rgb2xyz(hsl2rgb(hsv2hsl(hsv)))), lch),
+            cmy: (hsv, cmy) => rgb2cmy(hsl2rgb(hsv2hsl(hsv)), cmy),
+            cmyk: (hsv, cmyk) => cmy2cmyk(rgb2cmy(hsl2rgb(hsv2hsl(hsv))), cmyk),
+        },
+        hwb: {
+            rgb: (hwb, rgb) => hsl2rgb(hsv2hsl(hwb2hsv(hwb)), rgb),
+            hsl: (hwb, hsl) => hsv2hsl(hwb2hsv(hwb), hsl),
+            hsv: hwb2hsv,
+            hwb: ident,
+            xyz: (hwb, xyz) => rgb2xyz(hsl2rgb(hsv2hsl(hwb2hsv(hwb))), xyz),
+            lab: (hwb, lab) => xyz2lab(rgb2xyz(hsl2rgb(hsv2hsl(hwb2hsv(hwb)))), lab),
+            lch: (hwb, lch) => lab2lch(xyz2lab(rgb2xyz(hsl2rgb(hsv2hsl(hwb2hsv(hwb))))), lch),
+            cmy: (hwb, cmy) => rgb2cmy(hsl2rgb(hsv2hsl(hwb2hsv(hwb))), cmy),
+            cmyk: (hwb, cmyk) => cmy2cmyk(rgb2cmy(hsl2rgb(hsv2hsl(hwb2hsv(hwb)))), cmyk),
+        },
+        xyz: {
+            rgb: xyz2rgb,
+            hsl: (xyz, hsl) => rgb2hsl(xyz2rgb(xyz), hsl),
+            hsv: (xyz, hsv) => hsl2hsv(rgb2hsl(xyz2rgb(xyz)), hsv),
+            hwb: (xyz, hwb) => hsv2hwb(hsl2hsv(rgb2hsl(xyz2rgb(xyz))), hwb),
+            xyz: ident,
+            lab: xyz2lab,
+            lch: (xyz, lch) => lab2lch(xyz2lab(xyz), lch),
+            cmy: (xyz, cmy) => rgb2cmy(xyz2rgb(xyz), cmy),
+            cmyk: (xyz, cmyk) => cmy2cmyk(rgb2cmy(xyz2rgb(xyz)), cmyk),
+        },
+        lab: {
+            rgb: (lab, rgb) => xyz2rgb(lab2xyz(lab), rgb),
+            hsl: (lab, hsl) => rgb2hsl(xyz2rgb(lab2xyz(lab)), hsl),
+            hsv: (lab, hsv) => hsl2hsv(rgb2hsl(xyz2rgb(lab2xyz(lab))), hsv),
+            hwb: (lab, hwb) => hsv2hwb(hsl2hsv(rgb2hsl(xyz2rgb(lab2xyz(lab)))), hwb),
+            xyz: lab2xyz,
+            lab: ident,
+            lch: lab2lch,
+            cmy: (lab, cmy) => rgb2cmy(xyz2rgb(lab2xyz(lab)), cmy),
+            cmyk: (lab, cmyk) => cmy2cmyk(rgb2cmy(xyz2rgb(lab2xyz(lab))), cmyk),
+        },
+        lch: {
+            rgb: (lch, rgb) => xyz2rgb(lab2xyz(lch2lab(lch)), rgb),
+            hsl: (lch, hsl) => rgb2hsl(xyz2rgb(lab2xyz(lch2lab(lch))), hsl),
+            hsv: (lch, hsv) => hsl2hsv(rgb2hsl(xyz2rgb(lab2xyz(lch2lab(lch)))), hsv),
+            hwb: (lch, hwb) => hsv2hwb(hsl2hsv(rgb2hsl(xyz2rgb(lab2xyz(lch2lab(lch))))), hwb),
+            xyz: (lch, xyz) => lab2xyz(lch2lab(lch), xyz),
+            lab: lch2lab,
+            lch: ident,
+            cmy: (lch, cmy) => rgb2cmy(xyz2rgb(lab2xyz(lch2lab(lch))), cmy),
+            cmyk: (lch, cmyk) => cmy2cmyk(rgb2cmy(xyz2rgb(lab2xyz(lch2lab(lch)))), cmyk),
+        },
+        cmy: {
+            rgb: cmy2rgb,
+            hsl: (cmy, hsl) => rgb2hsl(cmy2rgb(cmy), hsl),
+            hsv: (cmy, hsv) => hsl2hsv(rgb2hsl(cmy2rgb(cmy)), hsv),
+            hwb: (cmy, hwb) => hsv2hwb(hsl2hsv(rgb2hsl(cmy2rgb(cmy))), hwb),
+            xyz: (cmy, xyz) => rgb2xyz(cmy2rgb(cmy), xyz),
+            lab: (cmy, lab) => xyz2lab(rgb2xyz(cmy2rgb(cmy)), lab),
+            lch: (cmy, lch) => lab2lch(xyz2lab(rgb2xyz(cmy2rgb(cmy))), lch),
+            cmy: ident,
+            cmyk: cmy2cmyk
+        },
+        cmyk: {
+            rgb: (cmyk, rgb) => cmy2rgb(cmyk2cmy(cmyk), rgb),
+            hsl: (cmyk, hsl) => rgb2hsl(cmy2rgb(cmyk2cmy(cmyk)), hsl),
+            hsv: (cmyk, hsv) => hsl2hsv(rgb2hsl(cmy2rgb(cmyk2cmy(cmyk))), hsv),
+            hwb: (cmyk, hwb) => hsv2hwb(hsl2hsv(rgb2hsl(cmy2rgb(cmyk2cmy(cmyk)))), hwb),
+            xyz: (cmyk, xyz) => rgb2xyz(cmy2rgb(cmyk2cmy(cmyk)), xyz),
+            lab: (cmyk, lab) => xyz2lab(rgb2xyz(cmy2rgb(cmyk2cmy(cmyk))), lab),
+            lch: (cmyk, lch) => lab2lch(xyz2lab(rgb2xyz(cmy2rgb(cmyk2cmy(cmyk)))), lch),
+            cmy: cmyk2cmy,
+            cmyk: ident
+        },
+    };
+
+    let equals = (a, b) => {
+        for (let key of Object.keys(a)) {
+            if (Math.abs(a[key] - b[key]) >= 1e-10) return false;
+        }
+        return true;
+    };
+
+    let test = (msg, a, b, compare = equals) => {
+        let pass = compare(a, b);
+        console.log(pass ? 'Passed' : 'Failed', msg + ':', a, b);
+    };
+
+    test('rgb2lch', convert.rgb.lch({ r: 82, g: 43, b: 119, a: 1 }), { l: 26.313249744265235, c: 49.89512965915749, h: 312.50800034280775, a: 1 });
+
+    console.log('Color.to:', new RGBColor(12, 165, 98).to('hsl').to('cmyk'));
+
+    let color = new Color;
+    console.log('convert(1):', new Color({ r: 82, g: 43, b: 119, a: 1 }, 'rgb').to('lab'));
+    console.log('convert(2):', Color.convert('rgb', 'lab', { r: 82, g: 43, b: 119, a: 1 }));
+
+    console.log('HSVColor:', new HSVColor(234, .42, .86).to('rgb').to('hsv') + '');
+
+    console.log('HSLColor:', new HSLColor(123, .28, .61).to('rgb').to('hsl') + '');
+
+    console.log('HWBColor:', new HWBColor(173, .22, .43).to('rgb') + '');
+
+    console.log('Color.hint:', Color.hint(new HSVColor(0, 0, 0)));
 
     //  http://colormine.org/convert/rgb-to-cmyk
-    let colorList = ['rgb', 'xyz', 'lab', 'lch', 'cmy', 'cmyk'];
-    for (let from of colorList)
-        for (let to of colorList)
-            if (from != to) console.log(from + 2 + to);
+    // let colorList = ['rgb', 'xyz', 'lab', 'lch', 'cmy', 'cmyk'];
+    // for (let from of colorList)
+    //     for (let to of colorList)
+    //         if (from != to) console.log(from + 2 + to);
 
     let parseHexColor = (string, index = 0, char = string[index]) => {
         if (char != '#') return;
