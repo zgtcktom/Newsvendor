@@ -10,16 +10,28 @@ window.onload = () => setTimeout(function () {
         return y0 * (1 - x) + y1 * x;
     };
 
-    let inStringListFunc = (list) => {
-        let hash = {};
-        for (let element of list) hash[element] = true;
-        return (element) => hash[element] === true;
+    let keyIter = { *[Symbol.iterator]() { yield* Object.keys(this); } };
+    // string hash
+    let hashmap = obj => Object.assign(Object.create(null), obj);
+    let hashset = iter => {
+        let map = hashmap(keyIter);
+        for (let key of iter) map[key] = true;
+        return map;
+    };
+
+    console.log(hashset(hashset('0123456789')));
+    console.log(hashmap(hashmap('0123456789')));
+
+    let isAny = list => {
+        let hash = hashset(list);
+        return key => hash[key];
     };
 
     // as in C ispunct
-    let isPunct = inStringListFunc('!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~');
-    let isSpace = inStringListFunc(' \n\t\v\f\r');
-    let isDigit = inStringListFunc('0123456789');
+    let isPunct = isAny('!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~');
+    let isSpace = isAny(' \n\t\v\f\r');
+    let isDigit = isAny('0123456789');
+    let isHexDigit = isAny('0123456789abcdefABCDEF');
 
     let parseInteger = (string, index = 0, char = string[index]) => {
         // actually unsigned
@@ -82,7 +94,7 @@ window.onload = () => setTimeout(function () {
     const PC = IN / 6;
     const PT = IN / 72;
 
-    const absoluteUnits = {
+    const absoluteUnits = hashmap({
         'cm': CM,
         'mm': MM,
         'Q': Q,
@@ -90,12 +102,12 @@ window.onload = () => setTimeout(function () {
         'pc': PC,
         'pt': PT,
         'px': PX,
-    };
+    });
 
     let defaultUnit = 'px';
 
     const noSupport = (name, element, document, window) => assert(false, 'no support yet');
-    const relativeUnits = {
+    const relativeUnits = hashmap({
         'em': (name, element, document, window) => {
             if (name == 'fontSize' || name == 'font-size') {
                 return MeasuredValue.parse(getComputedStyle(element.parentElement).fontSize).toUnit().value;
@@ -134,26 +146,37 @@ window.onload = () => setTimeout(function () {
                 return MeasuredValue.parse(getComputedStyle(element.parentElement).fontSize).toUnit().value * 0.01;
             return element.offsetParent.clientWidth * 0.01;
         },
-    };
+    });
 
     let getUnitValue = (unit, name, element, document = element?.ownerDocument, window = document?.defaultView) => {
-        if (Object.hasOwn(absoluteUnits, unit))
-            return absoluteUnits[unit];
-
-        if (Object.hasOwn(relativeUnits, unit))
-            return relativeUnits[unit](name, element, document, window);
+        return absoluteUnits[unit] || relativeUnits[unit]?.(name, element, document, window);
     };
 
+    let parseValue = (string, index = 0, char = string[index]) => {
+        let ret = parseNumber(string, index, char);
+        if (!ret) return;
+        let num, unit;
+        [index, num] = ret;
+        char = string[index];
+        if (char == '%') {
+            index++;
+            unit = '%';
+        } else if (ret = parseWord(string, index, char)) {
+            [index, unit] = ret;
+        }
+        return [index, new MeasuredValue(num, unit)];
+    };
 
-    class MeasuredValue {
-        static absoluteUnits = absoluteUnits;
-
-        static parse(string, partial = false) {
-            let ret = parseValue(string);
-            if (!ret) return;
+    let parse = (parseFn) => (string, partial = false) => {
+        let ret = parseFn(string);
+        if (ret) {
             let [index, value] = ret;
             if (partial || index == string.length) return value;
         }
+    };
+
+    class MeasuredValue {
+        static parse = parse(parseValue);
 
         static mix(a, b, percentage, unitValue, defaultUnit) {
             let value, unit;
@@ -184,20 +207,7 @@ window.onload = () => setTimeout(function () {
         }
     };
 
-    let parseValue = (string, index = 0, char = string[index]) => {
-        let ret = parseNumber(string, index, char);
-        if (!ret) return;
-        let num, unit;
-        [index, num] = ret;
-        char = string[index];
-        if (char == '%') {
-            index++;
-            unit = '%';
-        } else if (ret = parseWord(string, index, char)) {
-            [index, unit] = ret;
-        }
-        return [index, new MeasuredValue(num, unit)];
-    };
+    console.log('parse(parseValue):', parse(parseValue)('56ms'));
 
     console.log('toUnit:', MeasuredValue.parse('1cm').toUnit('px'));
 
@@ -299,15 +309,35 @@ window.onload = () => setTimeout(function () {
     };
 
     class Color {
-        #length;
-        constructor(channel) {
-            this.#length = channel;
-        }
+        static EPSILON = 1e-10;
+
+        type = '';
+
+        constructor() { }
+
+        *[Symbol.iterator]() { }
 
         clone() {
-            return new Color();
+            return new this.constructor(...this);
+        }
+
+        equals(other) {
+            if (this.type == other.type) {
+                let channels = Array.from(this);
+                let otherChannels = Array.from(other);
+                for (let i = 0; i < channels.length; i++) {
+                    if (Math.abs(channels[i] - otherChannels[i]) >= Color.EPSILON)
+                        return false;
+                }
+                return true;
+            }
+            return this.toRGBA().equals(other.toRGBA());
         }
     }
+    // color conversion formula found in: 
+    // https://axonflux.com/handy-rgb-to-hsl-and-rgb-to-hsv-color-model-c
+    // https://web.archive.org/web/20071029230340/http://www.easyrgb.com/math.php?MATH=M19#text19
+
 
     class RGBColor extends Color {
         static mix(a, b, percentage) {
@@ -316,26 +346,69 @@ window.onload = () => setTimeout(function () {
 
         type = 'rgb';
 
-        constructor(r, g, b) {
-            super(3);
+        constructor(r, g, b, a = 1) {
+            super();
             this.r = r;
             this.g = g;
             this.b = b;
+            this.a = a;
         }
 
-        clone() {
-            return new RGBColor(this.r, this.g, this.b);
+        *[Symbol.iterator]() {
+            let { r, g, b } = this;
+            yield r;
+            yield g;
+            yield b;
         }
 
         toString() {
-            let { r, g, b } = this;
-            return `rgb(${r}, ${g}, ${b})`;
+            let { r, g, b, a } = this;
+            if (a == 1)
+                return `rgb(${r}, ${g}, ${b})`;
+            return `rgb(${r}, ${g}, ${b}, ${a})`;
+        }
+
+        toRGB() {
+            let { r, g, b, a } = this;
+            return new RGBColor(r, g, b, a);
         }
 
         toRGBA() {
-            return new RGBAColor(this.r, this.g, this.b, 1);
+            let { r, g, b } = this;
+            return new RGBAColor(r, g, b, 1);
+        }
+
+        toHSL() {
+            let { r, g, b, a } = this;
+            r /= 255;
+            g /= 255;
+            b /= 255;
+            let min = Math.min(r, g, b);
+            let max = Math.max(r, g, b);
+            let h, s, l = max * 0.5 + min * 0.5;
+            if (max == min) {
+                h = s = 0;
+            } else {
+                let d = max - min;
+                s = l < 0.5 ? d / (max + min) : d / (2 - max - min);
+                if (max == r)
+                    h = (g - b) / d + (g < b ? 6 : 0);
+                else if (max == g)
+                    h = (b - r) / d + 2;
+                else if (max == b)
+                    h = (r - g) / d + 4;
+                h = h * 60;
+            }
+            return new HSLColor(h, s, l, a);
+        }
+
+        toHSV() {
+            return this.toHSL().toHSV();
         }
     }
+
+    console.log(new RGBColor(1, 2, 3).clone());
+    console.log(new Color().clone().toString());
 
     class RGBAColor extends Color {
         static mix(a, b, percentage) {
@@ -345,15 +418,19 @@ window.onload = () => setTimeout(function () {
         type = 'rgba';
 
         constructor(r, g, b, a) {
-            super(4);
+            super();
             this.r = r;
             this.g = g;
             this.b = b;
             this.a = a;
         }
 
-        clone() {
-            return new RGBAColor(this.r, this.g, this.b, this.a);
+        *[Symbol.iterator]() {
+            let { r, g, b, a } = this;
+            yield r;
+            yield g;
+            yield b;
+            yield a;
         }
 
         toString() {
@@ -362,43 +439,360 @@ window.onload = () => setTimeout(function () {
         }
 
         toRGBA() {
-            return new RGBAColor(this.r, this.g, this.b, this.a);
+            return this.clone();
         }
     }
 
-    let isHexDigit = inStringListFunc('0123456789abcdefABCDEF');
+    let hue2rgb = (p, q, t) => {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t * 6 < 1) return p + (q - p) * 6 * t;
+        if (t * 2 < 1) return q;
+        if (t * 3 < 2) return p + (q - p) * (2 / 3 - t) * 6;
+        return p;
+    };
+
+    class HSLColor extends Color {
+        type = 'hsl';
+
+        constructor(h, s, l, a = 1) {
+            super();
+            this.h = h;
+            this.s = s;
+            this.l = l;
+            this.a = a;
+        }
+
+        *[Symbol.iterator]() {
+            let { h, s, l, a } = this;
+            yield h;
+            yield s;
+            yield l;
+            yield a;
+        }
+
+        toString() {
+            let { h, s, l, a } = this;
+
+            if (a == 1)
+                return `hsl(${h}, ${s * 100}%, ${l * 100}%)`;
+
+            return `hsl(${h}, ${s * 100}%, ${l * 100}%, ${a})`;
+        }
+
+        toRGB() {
+            let { h, s, l, a } = this;
+            let r, g, b;
+
+            if (s == 0)
+                r = g = b = l;
+            else {
+                h /= 360;
+                let q = l < 0.5 ? l * (1 + s) : l + s - s * l;
+                let p = 2 * l - q;
+                r = hue2rgb(p, q, h + 1 / 3);
+                g = hue2rgb(p, q, h);
+                b = hue2rgb(p, q, h - 1 / 3);
+            }
+
+            return new RGBColor(r * 255, g * 255, b * 255, a);
+        }
+
+        toHSV() {
+            let { h, s, l, a } = this;
+            let v = l + s * Math.min(l, 1 - l);
+            s = v == 0 ? 0 : 2 * (1 - l / v);
+            return new HSVColor(h, s, v, a);
+        }
+    }
+
+    class HSVColor extends Color {
+        type = 'hsv';
+
+        constructor(h, s, v, a = 1) {
+            super();
+            this.h = h;
+            this.s = s;
+            this.v = v;
+            this.a = a;
+        }
+
+        toString() {
+            let { h, s, v, a } = this;
+
+            if (a == 1)
+                return `hsv(${h}, ${s * 100}%, ${v * 100}%)`;
+
+            return `hsv(${h}, ${s * 100}%, ${v * 100}%, ${a})`;
+        }
+
+        toHSV() {
+            let { h, s, v, a } = this;
+            return new HSVColor(h, s, v, a);
+        }
+
+        toHSL() {
+            let { h, s, v, a } = this;
+            let l = v * (1 - s / 2);
+            s = l == 0 || l == 1 ? 0 : (v - l) / Math.min(l, 1 - l);
+            return new HSLColor(h, s, l, a);
+        }
+
+        toRGB() {
+            return this.toHSL().toRGB();
+        }
+    }
+
+    console.log('HSVColor:', new HSVColor(234, .42, .86).toRGB().toHSV() + '');
+
+    console.log('HSLColor:', new HSLColor(123, .28, .61).toRGB().toHSL() + '');
+
+    class HWBColor extends Color {
+        type = 'hwb';
+
+        constructor(h, w, b, a = 1) {
+            super();
+            this.h = h;
+            this.w = w;
+            this.b = b;
+            this.a = a;
+        }
+
+        toString() {
+            let { h, w, b, a } = this;
+
+            if (a == 1)
+                return `hwb(${h}, ${w * 100}%, ${b * 100}%)`;
+
+            return `hwb(${h}, ${w * 100}%, ${b * 100}%, ${a})`;
+        }
+
+        toHWB() {
+            let { h, w, b, a } = this;
+            return new HWBColor(h, w, b, a);
+        }
+
+        toHSV() {
+            let { h, w, b, a } = this;
+
+            let sum = w + b;
+            if (sum > 1) {
+                w /= sum;
+                b /= sum;
+            }
+
+            let s = 1 - w / (1 - b);
+            let v = 1 - b;
+            return new HSVColor(h, s, v, a);
+        }
+
+        toHSL() {
+            return this.toHSV().toHSL();
+        }
+
+        toRGB() {
+            return this.toHSL().toRGB();
+        }
+    }
+
+    console.log('HWBColor:', new HWBColor(173, .22, .43).toRGB() + '');
+
+    let rgbGamma = x => x > 0.04045 ? ((x + 0.055) / 1.055) ** 2.4 : x / 12.92;
+    let rgb2xyz = (rgb, xyz = {}) => {
+        let { r, g, b, a } = rgb;
+
+        r = rgbGamma(r / 255);
+        g = rgbGamma(g / 255);
+        b = rgbGamma(b / 255);
+
+        let x = r * 0.4124 + g * 0.3576 + b * 0.1805;
+        let y = r * 0.2126 + g * 0.7152 + b * 0.0722;
+        let z = r * 0.0193 + g * 0.1192 + b * 0.9505;
+
+        xyz.x = x; xyz.y = y; xyz.z = z; xyz.a = a;
+        return xyz;
+    };
+
+    console.log('rgb2xyz:', rgb2xyz({ r: 123, g: 4, b: 255, a: 1 }));
+
+    let xyzGamma = x => x > 0.0031308 ? 1.055 * x ** (1 / 2.4) - 0.055 : 12.92 * x;
+    let xyz2rgb = (xyz, rgb = {}) => {
+        let { x, y, z, a } = xyz;
+
+        let r = x * 3.2406 + y * -1.5372 + z * -0.4986;
+        let g = x * -0.9689 + y * 1.8758 + z * 0.0415;
+        let b = x * 0.0557 + y * -0.2040 + z * 1.0570;
+
+        r = xyzGamma(r) * 255;
+        g = xyzGamma(g) * 255;
+        b = xyzGamma(b) * 255;
+
+        rgb.r = r; rgb.g = g; rgb.b = b; rgb.a = a;
+        return rgb;
+    };
+
+    console.log('xyz2rgb:', xyz2rgb(rgb2xyz({ r: 123, g: 4, b: 255, a: 1 })));
+
+    // Observer = 2°, Illuminant = D65
+    let xRef = 0.950456, yRef = 1.000000, zRef = 1.088754;
+    let xyz2lab = (xyz, lab = {}) => {
+        let { x, y, z, a: alpha } = xyz;
+
+        x /= xRef; y /= yRef; z /= zRef;
+
+        x = x > 0.008856 ? x ** (1 / 3) : 7.787 * x + 16 / 116;
+        y = y > 0.008856 ? y ** (1 / 3) : 7.787 * y + 16 / 116;
+        z = z > 0.008856 ? z ** (1 / 3) : 7.787 * z + 16 / 116;
+
+        let l = 116 * y - 16;
+        let a = 500 * (x - y);
+        let b = 200 * (y - z);
+
+        lab.l = l; lab.a = a; lab.b = b; lab.alpha = alpha;
+        return lab;
+    };
+
+    console.log('xyz2lab:', xyz2lab(rgb2xyz({ r: 15, g: 96, b: 32, a: 1 })));
+
+    let lab2xyz = (lab, xyz = {}) => {
+        let { l, a, b, alpha } = lab;
+
+        let y = (l + 16) / 116;
+        let x = a / 500 + y;
+        let z = y - b / 200;
+
+        x = (x ** 3 > 0.008856 ? x ** 3 : (x - 16 / 116) / 7.787) * xRef;
+        y = (y ** 3 > 0.008856 ? y ** 3 : (y - 16 / 116) / 7.787) * yRef;
+        z = (z ** 3 > 0.008856 ? z ** 3 : (z - 16 / 116) / 7.787) * zRef;
+
+        xyz.x = x; xyz.y = y; xyz.z = z; xyz.a = alpha;
+        return xyz;
+    };
+
+    console.log('xyz2lab:', xyz2rgb(lab2xyz(xyz2lab(rgb2xyz({ r: 15, g: 96, b: 32, a: 1 })))));
+
+    let lab2lch = (lab, lch = {}) => {
+        let { l, a, b, alpha } = lab;
+
+        h = Math.atan(b / a);
+        h = h > 0 ? h / Math.PI * 180 : 360 - (Math.abs(h) / Math.PI) * 180;
+
+        let c = Math.sqrt(a ** 2 + b ** 2);
+
+        lch.l = l; lch.c = c; lch.h = h; lch.a = alpha;
+        return lch;
+    };
+
+    console.log('lab2lch:', lab2lch(xyz2lab(rgb2xyz({ r: 34, g: 64, b: 129, a: 1 }))));
+
+    let lch2lab = (lch, lab = {}) => {
+        let { l, c, h, a: alpha } = lch;
+
+        let a = Math.cos(h / 180 * Math.PI) * c;
+        let b = Math.sin(h / 180 * Math.PI) * c;
+
+        lab.l = l; lab.a = a; lab.b = b; lab.alpha = alpha;
+        return lab;
+    };
+
+    console.log('lch2lab:', xyz2rgb(lab2xyz(lch2lab(lab2lch(xyz2lab(rgb2xyz({ r: 34, g: 64, b: 129, a: 1 })))))));
+
+    let rgb2cmy = (rgb, cmy = {}) => {
+        let { r, g, b, a } = rgb;
+
+        let c = 1 - (r / 255);
+        let m = 1 - (g / 255);
+        let y = 1 - (b / 255);
+
+        cmy.c = c; cmy.m = m; cmy.y = y; cmy.a = a;
+        return cmy;
+    };
+
+    console.log('rgb2cmy:', rgb2cmy({ r: 82, g: 43, b: 119, a: 1 }));
+
+    let cmy2rgb = (cmy, rgb = {}) => {
+        let { c, m, y, a } = cmy;
+
+        let r = (1 - c) * 255;
+        let g = (1 - m) * 255;
+        let b = (1 - y) * 255;
+
+        rgb.r = r; rgb.g = g; rgb.b = b; rgb.a = a;
+        return rgb;
+    };
+
+    console.log('cmy2rgb:', cmy2rgb(rgb2cmy({ r: 82, g: 43, b: 119, a: 1 })));
+
+    let cmy2cmyk = (cmy, cmyk = {}) => {
+        let { c, m, y, a } = cmy;
+
+        let k = Math.min(c, m, y, 1);
+
+        if (k == 1)
+            c = m = y = 0;
+        else {
+            c = (c - k) / (1 - k);
+            m = (m - k) / (1 - k);
+            y = (y - k) / (1 - k);
+        }
+
+        cmyk.c = c; cmyk.m = m; cmyk.y = y; cmyk.k = k; cmyk.a = a;
+        return cmyk;
+    };
+
+    console.log('cmy2cmyk:', cmy2cmyk(rgb2cmy({ r: 82, g: 43, b: 119, a: 1 })));
+
+    let cmyk2cmy = (cmyk, cmy = {}) => {
+        let { c, m, y, k, a } = cmyk;
+
+        c = c * (1 - k) + k;
+        m = m * (1 - k) + k;
+        y = y * (1 - k) + k;
+
+        cmy.c = c; cmy.m = m; cmy.y = y; cmy.a = a;
+        return cmy;
+    };
+
+    console.log('cmyk2cmy:', cmy2rgb(cmyk2cmy(cmy2cmyk(rgb2cmy({ r: 82, g: 43, b: 119, a: 1 })))));
+
+    //  http://colormine.org/convert/rgb-to-cmyk
+    let colorList = ['rgb', 'xyz', 'lab', 'lch', 'cmy', 'cmyk'];
+    for (let from of colorList)
+        for (let to of colorList)
+            if (from != to) console.log(from + 2 + to);
+
     let parseHexColor = (string, index = 0, char = string[index]) => {
         if (char != '#') return;
-        let startIndex = index;
         index++;
+        let startIndex = index;
         while (index < string.length && index - startIndex <= 8) {
             char = string[index];
             if (!isHexDigit(char)) break;
             index++;
         }
-        let hex = string.slice(startIndex + 1, index);
+        let hex = string.slice(startIndex, index);
         let len = hex.length;
         let color;
         if (len == 8) {
-            color = new RGBAColor(hexToNum(hex, 0, 2), hexToNum(hex, 2, 4), hexToNum(hex, 4, 6), hexToNum(hex, 6, 8) / 255);
+            color = new RGBAColor(hex2dec(hex, 0, 2), hex2dec(hex, 2, 4), hex2dec(hex, 4, 6), hex2dec(hex, 6, 8) / 255);
         } else if (len >= 6) {
-            color = new RGBColor(hexToNum(hex, 0, 2), hexToNum(hex, 2, 4), hexToNum(hex, 4, 6));
+            color = new RGBColor(hex2dec(hex, 0, 2), hex2dec(hex, 2, 4), hex2dec(hex, 4, 6));
         } else if (len >= 4) {
-            color = new RGBAColor(hexToNum(hex, 0, 1) * 17, hexToNum(hex, 1, 2) * 17, hexToNum(hex, 2, 3) * 17, hexToNum(hex, 3, 4) * 17 / 255);
+            color = new RGBAColor(hex2dec(hex, 0, 1) * 17, hex2dec(hex, 1, 2) * 17, hex2dec(hex, 2, 3) * 17, hex2dec(hex, 3, 4) * 17 / 255);
         } else if (len == 3) {
-            color = new RGBColor(hexToNum(hex, 0, 1) * 17, hexToNum(hex, 1, 2) * 17, hexToNum(hex, 2, 3) * 17);
+            color = new RGBColor(hex2dec(hex, 0, 1) * 17, hex2dec(hex, 1, 2) * 17, hex2dec(hex, 2, 3) * 17);
         } else return;
         return [index, color];
     };
 
-    let hexCode = { 0: 0, 1: 0, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, a: 10, b: 11, c: 12, d: 13, e: 14, f: 15, A: 10, B: 11, C: 12, D: 13, E: 14, F: 15 };
-    let hexToNum = (hex, startIndex = 0, lastIndex = hex.length) => {
-        let num = 0;
-        for (let i = startIndex; i < lastIndex; i++) {
-            num = num * 16 + hexCode[hex[i]];
-        }
-        return num;
+    let hexCode = hashmap({ 0: 0, 1: 0, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, a: 10, b: 11, c: 12, d: 13, e: 14, f: 15, A: 10, B: 11, C: 12, D: 13, E: 14, F: 15 });
+    let hex2dec = (hex, startIndex = 0, lastIndex = hex.length) => {
+        let n = 0;
+        for (let i = startIndex; i < lastIndex; i++) n = n * 16 + hexCode[hex[i]];
+        return n;
     };
+
+    console.log('parseInt', parseInt('g'.slice(0, 1), 16) * 17);
 
     const colorKeywords = ['rgba', 'rgb'];
     let parseColorFunction = (string, index = 0, char = string[index]) => {
@@ -440,7 +834,7 @@ window.onload = () => setTimeout(function () {
     let CSS3 = { aliceblue: '#f0f8ff', antiquewhite: '#faebd7', aquamarine: '#7fffd4', azure: '#f0ffff', beige: '#f5f5dc', bisque: '#ffe4c4', blanchedalmond: '#ffebcd', blueviolet: '#8a2be2', brown: '#a52a2a', burlywood: '#deb887', cadetblue: '#5f9ea0', chartreuse: '#7fff00', chocolate: '#d2691e', coral: '#ff7f50', cornflowerblue: '#6495ed', cornsilk: '#fff8dc', crimson: '#dc143c', cyan: '#00ffff', darkblue: '#00008b', darkcyan: '#008b8b', darkgoldenrod: '#b8860b', darkgray: '#a9a9a9', darkgreen: '#006400', darkgrey: '#a9a9a9', darkkhaki: '#bdb76b', darkmagenta: '#8b008b', darkolivegreen: '#556b2f', darkorange: '#ff8c00', darkorchid: '#9932cc', darkred: '#8b0000', darksalmon: '#e9967a', darkseagreen: '#8fbc8f', darkslateblue: '#483d8b', darkslategray: '#2f4f4f', darkslategrey: '#2f4f4f', darkturquoise: '#00ced1', darkviolet: '#9400d3', deeppink: '#ff1493', deepskyblue: '#00bfff', dimgray: '#696969', dimgrey: '#696969', dodgerblue: '#1e90ff', firebrick: '#b22222', floralwhite: '#fffaf0', forestgreen: '#228b22', gainsboro: '#dcdcdc', ghostwhite: '#f8f8ff', gold: '#ffd700', goldenrod: '#daa520', greenyellow: '#adff2f', grey: '#808080', honeydew: '#f0fff0', hotpink: '#ff69b4', indianred: '#cd5c5c', indigo: '#4b0082', ivory: '#fffff0', khaki: '#f0e68c', lavender: '#e6e6fa', lavenderblush: '#fff0f5', lawngreen: '#7cfc00', lemonchiffon: '#fffacd', lightblue: '#add8e6', lightcoral: '#f08080', lightcyan: '#e0ffff', lightgoldenrodyellow: '#fafad2', lightgray: '#d3d3d3', lightgreen: '#90ee90', lightgrey: '#d3d3d3', lightpink: '#ffb6c1', lightsalmon: '#ffa07a', lightseagreen: '#20b2aa', lightskyblue: '#87cefa', lightslategray: '#778899', lightslategrey: '#778899', lightsteelblue: '#b0c4de', lightyellow: '#ffffe0', limegreen: '#32cd32', linen: '#faf0e6', magenta: '#ff00ff', mediumaquamarine: '#66cdaa', mediumblue: '#0000cd', mediumorchid: '#ba55d3', mediumpurple: '#9370db', mediumseagreen: '#3cb371', mediumslateblue: '#7b68ee', mediumspringgreen: '#00fa9a', mediumturquoise: '#48d1cc', mediumvioletred: '#c71585', midnightblue: '#191970', mintcream: '#f5fffa', mistyrose: '#ffe4e1', moccasin: '#ffe4b5', navajowhite: '#ffdead', oldlace: '#fdf5e6', olivedrab: '#6b8e23', orangered: '#ff4500', orchid: '#da70d6', palegoldenrod: '#eee8aa', palegreen: '#98fb98', paleturquoise: '#afeeee', palevioletred: '#db7093', papayawhip: '#ffefd5', peachpuff: '#ffdab9', peru: '#cd853f', pink: '#ffc0cb', plum: '#dda0dd', powderblue: '#b0e0e6', rosybrown: '#bc8f8f', royalblue: '#4169e1', saddlebrown: '#8b4513', salmon: '#fa8072', sandybrown: '#f4a460', seagreen: '#2e8b57', seashell: '#fff5ee', sienna: '#a0522d', skyblue: '#87ceeb', slateblue: '#6a5acd', slategray: '#708090', slategrey: '#708090', snow: '#fffafa', springgreen: '#00ff7f', steelblue: '#4682b4', tan: '#d2b48c', thistle: '#d8bfd8', tomato: '#ff6347', transparent: '#0000', turquoise: '#40e0d0', violet: '#ee82ee', wheat: '#f5deb3', whitesmoke: '#f5f5f5', yellowgreen: '#9acd32' };
     let CSS4 = { rebeccapurple: '#663399' };
     let namedHexColors = { ...CSS1, ...CSS2, ...CSS3, ...CSS4 };
-    let namedColors = Object.fromEntries(Object.entries(namedHexColors).map(([key, value]) => [key, parseHexColor(value)[1]]));
+    let namedColors = hashmap(Object.fromEntries(Object.entries(namedHexColors).map(([key, value]) => [key, parseHexColor(value)[1]])));
 
     // console.log(namedColors);
 
@@ -449,7 +843,7 @@ window.onload = () => setTimeout(function () {
         if (!ret) return;
         let name;
         [index, name] = ret;
-        if (!Object.hasOwn(namedColors, name)) return;
+        if (!namedColors[name]) return;
         return [index, namedColors[name]];
     };
 
@@ -736,22 +1130,22 @@ window.onload = () => setTimeout(function () {
         animation.update(animation.progress = progress.value);
     };
 
-    Promise.resolve(animation).then((data) => {
-        console.log(1, data);
-        return data.restart();
-    }).then((data) => {
-        console.log(2, data);
-        return data.restart();
-    }).then((data) => {
-        console.log(3, data);
-    }).catch(e => {
-        console.log('stop in the middle:', e);
-    });
+    // Promise.resolve(animation).then((data) => {
+    //     console.log(1, data);
+    //     return data.restart();
+    // }).then((data) => {
+    //     console.log(2, data);
+    //     return data.restart();
+    // }).then((data) => {
+    //     console.log(3, data);
+    // }).catch(e => {
+    //     console.log('stop in the middle:', e);
+    // });
 
-    setTimeout(() => {
-        console.log('animation.stop();');
-        animation.stop();
-    }, 2500);
+    // setTimeout(() => {
+    //     console.log('animation.stop();');
+    //     animation.stop();
+    // }, 2500);
 
 
     // console.log(parseNumber('-123.265em'));
