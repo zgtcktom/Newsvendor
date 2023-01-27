@@ -308,206 +308,65 @@ window.onload = () => setTimeout(function () {
         return [index, values];
     };
 
-    class Color {
-        static convert(sourceType, targetType, sourceColor, targetColor) {
-            return convert[sourceType]?.[targetType]?.(sourceColor, targetColor);
-        }
-
-        static hint(color) {
-            {
-                let { r, g, b } = color;
-                if (r != null && g != null && b != null) return 'rgb';
-            };
-            {
-                let { h, s, l } = color;
-                if (h != null && s != null && l != null) return 'hsl';
-            };
-            {
-                let { h, s, v } = color;
-                if (h != null && s != null && v != null) return 'hsv';
-            };
-        }
-
-        static EPSILON = 1e-10;
-
-        type = null;
-
-        constructor(channels, type) {
-            if (channels) {
-                Object.assign(this, channels);
-            }
-            if (type) {
-                this.type = type;
-            }
-        }
-
-        *[Symbol.iterator]() { }
-
-        clone() {
-            return new this.constructor(...this);
-        }
-
-        equals(other) {
-            if (this.type == other.type) {
-                let channels = Array.from(this);
-                let otherChannels = Array.from(other);
-                for (let i = 0; i < channels.length; i++) {
-                    if (Math.abs(channels[i] - otherChannels[i]) >= Color.EPSILON)
-                        return false;
+    let findPath = (convert, sourceType, targetType) => {
+        let stack = [sourceType];
+        let paths = [[sourceType]];
+        while (stack.length > 0) {
+            let sourceType = stack.pop();
+            let path = paths.pop();
+            let allVisited = true;
+            for (let type of Object.keys(convert[sourceType])) {
+                if (path.includes(type)) continue;
+                let currentPath = path.concat([type]);
+                if (type == targetType) {
+                    return currentPath;
                 }
-                return true;
+                stack.push(type);
+                paths.push(currentPath);
+                allVisited = false;
             }
-            return this.toRGBA().equals(other.toRGBA());
+            if (allVisited) {
+                continue;
+            }
         }
+    };
 
-        to(type) {
-            // console.log(convert[this.type]?.[type]);
-            return Color.convert(this.type, type, this, ColorConstructors[type] ? new ColorConstructors[type] : new Color(null, type));
+    let convertChain = (chain) => {
+        // let body;
+
+        // if (chain.length == 2) {
+        //     body = chain[0] + '2' + chain[1] + '(' + chain[0] + ', ' + chain[1] + ')';
+        // } else {
+        //     body = chain[0] + '2' + chain[1] + '(' + chain[0] + ')';
+        //     for (let i = 1; i < chain.length - 2; i++) {
+        //         body = chain[i] + '2' + chain[i + 1] + '(' + body + ')';
+        //     }
+        //     body = chain[chain.length - 2] + '2' + chain[chain.length - 1] + '(' + body + ', ' + chain[chain.length - 1] + ')';
+        // }
+
+        // body = 'console.log(this);return ' + body;
+
+        // return new Function(chain[0], chain[chain.length - 1], body);
+
+        return (sourceColor, targetColor) => {
+            let color = sourceColor;
+            let last = chain.length - 2;
+            for (let i = 0; i < last; i++) {
+                color = convert[chain[i]][chain[i + 1]](color);
+            }
+            return convert[chain[last]][chain[last + 1]](color, targetColor);
+        };
+    };
+
+    let checkComplete = (convert) => {
+        let schemes = Object.keys(convert);
+        for (let sourceType of schemes) {
+            for (let targetType of schemes) {
+                if (!convert[sourceType]?.[targetType]) {
+                    console.log(sourceType + 2 + targetType, 'missing');
+                }
+            }
         }
-    }
-    // color conversion formula found in: 
-    // https://axonflux.com/handy-rgb-to-hsl-and-rgb-to-hsv-color-model-c
-    // https://web.archive.org/web/20071029230340/http://www.easyrgb.com/math.php?MATH=M19#text19
-
-
-    class RGBColor extends Color {
-        static mix(a, b, percentage) {
-            return new RGBColor(mix(a.r, b.r, percentage), mix(a.g, b.g, percentage), mix(a.b, b.b, percentage));
-        }
-
-        type = 'rgb';
-
-        constructor(r, g, b, a = 1) {
-            super();
-            this.r = r;
-            this.g = g;
-            this.b = b;
-            this.a = a;
-        }
-
-        *[Symbol.iterator]() {
-            let { r, g, b } = this;
-            yield r;
-            yield g;
-            yield b;
-        }
-
-        toString() {
-            let { r, g, b, a } = this;
-            if (a == 1)
-                return `rgb(${r}, ${g}, ${b})`;
-            return `rgb(${r}, ${g}, ${b}, ${a})`;
-        }
-    }
-
-    console.log(new RGBColor(1, 2, 3).clone());
-    console.log(new Color().clone().toString());
-
-    class RGBAColor extends Color {
-        static mix(a, b, percentage) {
-            return new RGBAColor(mix(a.r, b.r, percentage), mix(a.g, b.g, percentage), mix(a.b, b.b, percentage), mix(a.a, b.a, percentage));
-        }
-
-        type = 'rgba';
-
-        constructor(r, g, b, a) {
-            super();
-            this.r = r;
-            this.g = g;
-            this.b = b;
-            this.a = a;
-        }
-
-        *[Symbol.iterator]() {
-            let { r, g, b, a } = this;
-            yield r;
-            yield g;
-            yield b;
-            yield a;
-        }
-
-        toString() {
-            let { r, g, b, a } = this;
-            return `rgba(${r}, ${g}, ${b}, ${a})`;
-        }
-    }
-
-    class HSLColor extends Color {
-        type = 'hsl';
-
-        constructor(h, s, l, a = 1) {
-            super();
-            this.h = h;
-            this.s = s;
-            this.l = l;
-            this.a = a;
-        }
-
-        *[Symbol.iterator]() {
-            let { h, s, l, a } = this;
-            yield h;
-            yield s;
-            yield l;
-            yield a;
-        }
-
-        toString() {
-            let { h, s, l, a } = this;
-
-            if (a == 1)
-                return `hsl(${h}, ${s * 100}%, ${l * 100}%)`;
-
-            return `hsl(${h}, ${s * 100}%, ${l * 100}%, ${a})`;
-        }
-    }
-
-    class HSVColor extends Color {
-        type = 'hsv';
-
-        constructor(h, s, v, a = 1) {
-            super();
-            this.h = h;
-            this.s = s;
-            this.v = v;
-            this.a = a;
-        }
-
-        toString() {
-            let { h, s, v, a } = this;
-
-            if (a == 1)
-                return `hsv(${h}, ${s * 100}%, ${v * 100}%)`;
-
-            return `hsv(${h}, ${s * 100}%, ${v * 100}%, ${a})`;
-        }
-    }
-
-    class HWBColor extends Color {
-        type = 'hwb';
-
-        constructor(h, w, b, a = 1) {
-            super();
-            this.h = h;
-            this.w = w;
-            this.b = b;
-            this.a = a;
-        }
-
-        toString() {
-            let { h, w, b, a } = this;
-
-            if (a == 1)
-                return `hwb(${h}, ${w * 100}%, ${b * 100}%)`;
-
-            return `hwb(${h}, ${w * 100}%, ${b * 100}%, ${a})`;
-        }
-    }
-
-    let ColorConstructors = {
-        rgb: RGBColor,
-        hsl: HSLColor,
-        hwb: HWBColor,
-        hsv: HSVColor,
     };
 
     let rgb2hsl = (rgb, hsl = {}) => {
@@ -772,9 +631,14 @@ window.onload = () => setTimeout(function () {
         return cmy;
     };
 
+    // https://www.w3.org/TR/css-color-4/#funcdef-hwb
+
     // console.log('cmyk2cmy:', cmy2rgb(cmyk2cmy(cmy2cmyk(rgb2cmy({ r: 82, g: 43, b: 119, a: 1 })))));
 
-    let ident = (color, target = {}) => Object.assign(target, color);
+    let ident = (color, target = {}) => {
+        console.log('but why?');
+        return Object.assign(target, color);
+    };
 
     let convert = {
         rgb: {
@@ -878,24 +742,400 @@ window.onload = () => setTimeout(function () {
         },
     };
 
-    let equals = (a, b) => {
-        for (let key of Object.keys(a)) {
-            if (Math.abs(a[key] - b[key]) >= 1e-10) return false;
+    class Color {
+        static converter = hashmap();
+        static classes = hashmap();
+
+        static EPSILON = 1e-5;
+
+        static mix(a, b, percentage, type = null) {
+            a = Color.color(a);
+            b = Color.color(b);
+
+            type ??= a.type;
+
+            a = a.to(type);
+            b = b.to(type);
+
+            if (Color.classes[type]?.mix)
+                return Color.classes[type].mix(a, b, percentage);
+
+            let color = Color.color(null, type);
+            for (let channel of Object.keys(a)) {
+                if (channel != 'type')
+                    color[channel] = mix(a[channel], b[channel], percentage);
+            }
+
+            return color;
         }
-        return true;
-    };
 
-    let test = (msg, a, b, compare = equals) => {
-        let pass = compare(a, b);
-        console.log(pass ? 'Passed' : 'Failed', msg + ':', a, b);
-    };
+        static color(color, type = null) {
+            if (color instanceof Color)
+                return type == null ? color : color.to(type);
 
-    test('rgb2lch', convert.rgb.lch({ r: 82, g: 43, b: 119, a: 1 }), { l: 26.313249744265235, c: 49.89512965915749, h: 312.50800034280775, a: 1 });
+            type ??= color?.type ?? Color.hint(color);
+
+            let fn = Color.classes[type];
+            if (!fn)
+                return Object.assign(new Color, color, { type });
+            if (color == null)
+                return new fn;
+            if (color[Symbol.iterator])
+                return new fn(...color);
+
+            return Object.assign(new fn, color);
+        }
+
+        static convert(sourceType, targetType, sourceColor, targetColor) {
+            return convert[sourceType]?.[targetType]?.(sourceColor, targetColor);
+        }
+
+        static hint(color) {
+            if (color == null) return;
+            {
+                let { r, g, b } = color;
+                if (r != null && g != null && b != null) return 'rgb';
+            };
+            {
+                let { h, s, l } = color;
+                if (h != null && s != null && l != null) return 'hsl';
+            };
+            {
+                let { h, s, v } = color;
+                if (h != null && s != null && v != null) return 'hsv';
+            };
+            {
+                let { h, w, b } = color;
+                if (h != null && w != null && b != null) return 'hwb';
+            };
+            {
+                let { x, y, z } = color;
+                if (x != null && y != null && z != null) return 'xyz';
+            };
+            {
+                let { l, a, b } = color;
+                if (l != null && a != null && b != null) return 'lab';
+            };
+            {
+                let { l, c, h } = color;
+                if (l != null && c != null && h != null) return 'lch';
+            };
+            {
+                let { c, m, y } = color;
+                if (c != null && m != null && y != null) return 'cmy';
+            };
+            {
+                let { c, m, y, k } = color;
+                if (c != null && m != null && y != null && k != null) return 'cmyk';
+            };
+        }
+
+        type = null;
+        constructor() { }
+
+        toString() {
+            return `color(${JSON.stringify(this)})`;
+        }
+
+        equals(other) {
+            if (this.type != other.type) return this.equals(other.to(this.type));
+
+            for (let channel of Object.keys(this)) {
+                if (channel != 'type' && Math.abs(this[channel] - other[channel]) >= Color.EPSILON)
+                    return false;
+            }
+
+            return true;
+        }
+
+        to(type) {
+            if (this.type == type) return this;
+
+            if (type == 'hex') {
+                let { r, g, b, a } = this.to('rgb');
+
+                r = Math.round(r).toString(16);
+                g = Math.round(g).toString(16);
+                b = Math.round(b).toString(16);
+                a = Math.round(a * 255).toString(16);
+
+                if (a == 'ff') {
+                    return '#' + r + g + b;
+                }
+                return '#' + r + g + b + a;
+            }
+
+            return Color.convert(this.type, type, this, Color.color(null, type));
+        }
+
+        array() {
+            return [...this];
+        }
+    }
+
+    Object.assign(Color.converter, convert);
+
+    // color conversion formula found in: 
+    // https://axonflux.com/handy-rgb-to-hsl-and-rgb-to-hsv-color-model-c
+    // https://web.archive.org/web/20071029230340/http://www.easyrgb.com/math.php?MATH=M19#text19
+
+
+    class RGBColor extends Color {
+        static mix(a, b, percentage) {
+            return new RGBColor(mix(a.r, b.r, percentage), mix(a.g, b.g, percentage), mix(a.b, b.b, percentage), mix(a.a, b.a, percentage));
+        }
+
+        type = 'rgb';
+        constructor(r, g, b, a = 1) {
+            super();
+            this.r = r; this.g = g; this.b = b; this.a = a;
+        }
+
+        *[Symbol.iterator]() {
+            let { r, g, b, a } = this;
+            yield r; yield g; yield b; yield a;
+        }
+
+        toString() {
+            let { r, g, b, a } = this;
+
+            if (a == 1)
+                return `rgb(${r}, ${g}, ${b})`;
+
+            return `rgb(${r}, ${g}, ${b}, ${a})`;
+        }
+    }
+
+    class HSLColor extends Color {
+        static mix(a, b, percentage) {
+            return new HSLColor(mix(a.h, b.h, percentage), mix(a.s, b.s, percentage), mix(a.l, b.l, percentage), mix(a.a, b.a, percentage));
+        }
+
+        type = 'hsl';
+        constructor(h, s, l, a = 1) {
+            super();
+            this.h = h; this.s = s; this.l = l; this.a = a;
+        }
+
+        *[Symbol.iterator]() {
+            let { h, s, l, a } = this;
+            yield h; yield s; yield l; yield a;
+        }
+
+        toString() {
+            let { h, s, l, a } = this;
+
+            if (a == 1)
+                return `hsl(${h}, ${s * 100}%, ${l * 100}%)`;
+
+            return `hsl(${h}, ${s * 100}%, ${l * 100}%, ${a})`;
+        }
+    }
+
+    class HSVColor extends Color {
+        static mix(a, b, percentage) {
+            return new HSVColor(mix(a.h, b.h, percentage), mix(a.s, b.s, percentage), mix(a.v, b.v, percentage), mix(a.a, b.a, percentage));
+        }
+
+        type = 'hsv';
+        constructor(h, s, v, a = 1) {
+            super();
+            this.h = h; this.s = s; this.v = v; this.a = a;
+        }
+
+        *[Symbol.iterator]() {
+            let { h, s, v, a } = this;
+            yield h; yield s; yield v; yield a;
+        }
+
+        toString() {
+            let { h, s, v, a } = this;
+
+            if (a == 1)
+                return `hsv(${h}, ${s * 100}%, ${v * 100}%)`;
+
+            return `hsv(${h}, ${s * 100}%, ${v * 100}%, ${a})`;
+        }
+    }
+
+    class HWBColor extends Color {
+        static mix(a, b, percentage) {
+            return new HWBColor(mix(a.h, b.h, percentage), mix(a.w, b.w, percentage), mix(a.b, b.b, percentage), mix(a.a, b.a, percentage));
+        }
+
+        type = 'hwb';
+        constructor(h, w, b, a = 1) {
+            super();
+            this.h = h; this.w = w; this.b = b; this.a = a;
+        }
+
+        *[Symbol.iterator]() {
+            let { h, w, b, a } = this;
+            yield h; yield w; yield b; yield a;
+        }
+
+        toString() {
+            let { h, w, b, a } = this;
+
+            if (a == 1)
+                return `hwb(${h}, ${w * 100}%, ${b * 100}%)`;
+
+            return `hwb(${h}, ${w * 100}%, ${b * 100}%, ${a})`;
+        }
+    }
+
+    class XYZColor extends Color {
+        static mix(a, b, percentage) {
+            return new XYZColor(mix(a.x, b.x, percentage), mix(a.y, b.y, percentage), mix(a.z, b.z, percentage), mix(a.a, b.a, percentage));
+        }
+
+        type = 'xyz';
+        constructor(x, y, z, a = 1) {
+            super();
+            this.x = x; this.y = y; this.z = z; this.a = a;
+        }
+
+        *[Symbol.iterator]() {
+            let { x, y, z, a } = this;
+            yield x; yield y; yield z; yield a;
+        }
+
+        toString() {
+            let { x, y, z, a } = this;
+
+            if (a == 1)
+                return `xyz(${x}%, ${y}, ${z})`;
+
+            return `xyz(${x}%, ${y}, ${z}, ${a})`;
+        }
+    }
+
+    class LABColor extends Color {
+        static mix(a, b, percentage) {
+            return new LABColor(mix(a.l, b.l, percentage), mix(a.a, b.a, percentage), mix(a.b, b.b, percentage), mix(a.alpha, b.alpha, percentage));
+        }
+
+        type = 'lab';
+        constructor(l, a, b, alpha = 1) {
+            super();
+            this.l = l; this.a = a; this.b = b; this.alpha = alpha;
+        }
+
+        *[Symbol.iterator]() {
+            let { l, a, b, alpha } = this;
+            yield l; yield a; yield b; yield alpha;
+        }
+
+        toString() {
+            let { l, a, b, alpha } = this;
+
+            if (alpha == 1)
+                return `lab(${l}%, ${a}, ${b})`;
+
+            return `lab(${l}%, ${a}, ${b}, ${alpha})`;
+        }
+    }
+
+    class LCHColor extends Color {
+        static mix(a, b, percentage) {
+            return new LCHColor(mix(a.l, b.l, percentage), mix(a.c, b.c, percentage), mix(a.h, b.h, percentage), mix(a.a, b.a, percentage));
+        }
+
+        type = 'lch';
+        constructor(l, c, h, a = 1) {
+            super();
+            this.l = l; this.c = c; this.h = h; this.a = a;
+        }
+
+        *[Symbol.iterator]() {
+            let { l, c, h, a } = this;
+            yield l; yield c; yield h; yield a;
+        }
+
+        toString() {
+            let { l, c, h, a } = this;
+
+            if (a == 1)
+                return `lch(${l}%, ${c}, ${h})`;
+
+            return `lch(${l}%, ${c}, ${h}, ${a})`;
+        }
+    }
+
+    class CMYColor extends Color {
+        static mix(a, b, percentage) {
+            return new CMYColor(mix(a.c, b.c, percentage), mix(a.m, b.m, percentage), mix(a.y, b.y, percentage), mix(a.a, b.a, percentage));
+        }
+
+        type = 'cmy';
+        constructor(c, m, y, a = 1) {
+            super();
+            this.c = c; this.m = m; this.y = y; this.a = a;
+        }
+
+        *[Symbol.iterator]() {
+            let { c, m, y, a } = this;
+            yield c; yield m; yield y; yield a;
+        }
+
+        toString() {
+            let { c, m, y, a } = this;
+
+            if (a == 1)
+                return `cmy(${c}%, ${m}, ${y})`;
+
+            return `cmy(${c}%, ${m}, ${y}, ${a})`;
+        }
+    }
+
+    class CMYKColor extends Color {
+        static mix(a, b, percentage) {
+            return new CMYKColor(mix(a.c, b.c, percentage), mix(a.m, b.m, percentage), mix(a.y, b.y, percentage), mix(a.k, b.k, percentage), mix(a.a, b.a, percentage));
+        }
+
+        type = 'cmyk';
+        constructor(c, m, y, k, a = 1) {
+            super();
+            this.c = c; this.m = m; this.y = y; this.k = k; this.a = a;
+        }
+
+        *[Symbol.iterator]() {
+            let { c, m, y, k, a } = this;
+            yield c; yield m; yield y; yield k; yield a;
+        }
+
+        toString() {
+            let { c, m, y, k, a } = this;
+
+            if (a == 1)
+                return `cmyk(${c}%, ${m}, ${y}, ${k})`;
+
+            return `cmyk(${c}%, ${m}, ${y}, ${k}, ${a})`;
+        }
+    }
+
+    Object.assign(Color.classes, {
+        rgb: RGBColor,
+        hsl: HSLColor,
+        hsv: HSVColor,
+        hwb: HWBColor,
+        xyz: XYZColor,
+        lab: LABColor,
+        lch: LCHColor,
+        cmy: CMYColor,
+        cmyk: CMYKColor,
+    });
+
+    // https://github.com/ibireme/yy_color_convertor/blob/master/yy_color_converter.c
+
+
+    checkComplete(convert);
+    console.log('findPath:', findPath(convert, 'cmyk', 'lch'), convertChain(findPath(convert, 'cmyk', 'lch'))({ c: 0.5, m: 0.1, y: 0.8, k: 0.2, a: 1 }));
 
     console.log('Color.to:', new RGBColor(12, 165, 98).to('hsl').to('cmyk'));
 
     let color = new Color;
-    console.log('convert(1):', new Color({ r: 82, g: 43, b: 119, a: 1 }, 'rgb').to('lab'));
+    console.log('convert(1):', Color.color({ r: 82, g: 43, b: 119, a: 1 }, 'rgb').to('lab'));
     console.log('convert(2):', Color.convert('rgb', 'lab', { r: 82, g: 43, b: 119, a: 1 }));
 
     console.log('HSVColor:', new HSVColor(234, .42, .86).to('rgb').to('hsv') + '');
@@ -904,9 +1144,32 @@ window.onload = () => setTimeout(function () {
 
     console.log('HWBColor:', new HWBColor(173, .22, .43).to('rgb') + '');
 
-    console.log('Color.hint:', Color.hint(new HSVColor(0, 0, 0)));
+    console.log('Color.hint:', Color.color({ r: 82, g: 43, b: 119, a: 1 }) + '');
 
-    //  http://colormine.org/convert/rgb-to-cmyk
+    console.log('Color.color', Color.color({ r: 82, g: 43, b: 119, a: 1 }).to('hsl') + '');
+
+    console.log('Color.mix', Color.mix({ r: 82, g: 43, b: 119 }, { h: 50, s: 0.5, l: 0.7 }, 0.5, 'hsl'));
+
+    console.log('Color.color:', Color.color(Object.assign(new Color, { type: 'rgb' })));
+
+    console.log('Pixels:',
+        [[0, 0, 0], [123, 52, 48]]
+            .map(channels => [...new RGBColor(...channels).to('hsl')].slice(0, -1))
+    );
+
+    console.log(Color.classes);
+    console.log(Color.converter);
+
+    console.log(Color.color([204, 50, 99, 0.5], 'rgb').to('hex'), '#CC3263');
+
+    {
+        let color = Color.color([204, 50, 99, 0.5], 'rgb');
+        console.log(color + '', color.array());
+    };
+
+    // console.log(Color.color2());
+
+    // http://colormine.org/convert/rgb-to-cmyk
     // let colorList = ['rgb', 'xyz', 'lab', 'lch', 'cmy', 'cmyk'];
     // for (let from of colorList)
     //     for (let to of colorList)
@@ -925,11 +1188,11 @@ window.onload = () => setTimeout(function () {
         let len = hex.length;
         let color;
         if (len == 8) {
-            color = new RGBAColor(hex2dec(hex, 0, 2), hex2dec(hex, 2, 4), hex2dec(hex, 4, 6), hex2dec(hex, 6, 8) / 255);
+            color = new RGBColor(hex2dec(hex, 0, 2), hex2dec(hex, 2, 4), hex2dec(hex, 4, 6), hex2dec(hex, 6, 8) / 255);
         } else if (len >= 6) {
             color = new RGBColor(hex2dec(hex, 0, 2), hex2dec(hex, 2, 4), hex2dec(hex, 4, 6));
         } else if (len >= 4) {
-            color = new RGBAColor(hex2dec(hex, 0, 1) * 17, hex2dec(hex, 1, 2) * 17, hex2dec(hex, 2, 3) * 17, hex2dec(hex, 3, 4) * 17 / 255);
+            color = new RGBColor(hex2dec(hex, 0, 1) * 17, hex2dec(hex, 1, 2) * 17, hex2dec(hex, 2, 3) * 17, hex2dec(hex, 3, 4) * 17 / 255);
         } else if (len == 3) {
             color = new RGBColor(hex2dec(hex, 0, 1) * 17, hex2dec(hex, 1, 2) * 17, hex2dec(hex, 2, 3) * 17);
         } else return;
@@ -943,7 +1206,7 @@ window.onload = () => setTimeout(function () {
         return n;
     };
 
-    console.log('parseInt', parseInt('g'.slice(0, 1), 16) * 17);
+    // console.log('parseInt', parseInt('g'.slice(0, 1), 16) * 17);
 
     const colorKeywords = ['rgba', 'rgb'];
     let parseColorFunction = (string, index = 0, char = string[index]) => {
@@ -1152,7 +1415,7 @@ window.onload = () => setTimeout(function () {
 
             let keys = new Set(states.flatMap(Object.keys));
             // console.log(keys);
-            console.log(markers, states);
+            // console.log(markers, states);
 
             let timeline = {};
             for (let key of keys) {
@@ -1165,7 +1428,7 @@ window.onload = () => setTimeout(function () {
                 }
                 timeline[key] = new Keyframes(times, values, unit => getUnitValue(unit, key, this.#element), this.#defaultUnit);
             }
-            console.log('timeline:', timeline);
+            // console.log('timeline:', timeline);
 
             this.#timeline = timeline;
 
@@ -1247,7 +1510,7 @@ window.onload = () => setTimeout(function () {
     };
 
     let element = document.getElementById('item');
-    console.log(element);
+    // console.log(element);
 
     let restart = document.getElementById('restart');
     let play = document.getElementById('play');
@@ -1271,7 +1534,7 @@ window.onload = () => setTimeout(function () {
     });
 
     animation.play();
-    console.log(animation);
+    // console.log(animation);
 
     restart.onclick = () => Promise.resolve(animation.restart()).then(() => console.log('restart by button'));
     play.onclick = () => animation.play();
@@ -1319,5 +1582,4 @@ window.onload = () => setTimeout(function () {
     //     parseAll('border: 5px solid darkblue;'),
     //     parseAll('border: 50% solid red;')
     // ));
-
 }, 100);
