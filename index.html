@@ -8,6 +8,7 @@
 			content="default-src 'self' ; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'"
 		/>
 		<title>Hello World!</title>
+		<script src="seedrandom.min.js"></script>
 		<style>
 			html,
 			body {
@@ -464,7 +465,9 @@
 				<table class="learning-table">
 					<thead>
 						<tr>
-							<td style="width: 30%">Choice</td>
+							<td>Action</td>
+							<td>Reward</td>
+							<td>Average reward</td>
 							<td>IE Value</td>
 						</tr>
 					</thead>
@@ -472,9 +475,7 @@
 						<tr>
 							<td>0</td>
 							<td>0</td>
-						</tr>
-						<tr>
-							<td>1</td>
+							<td>0</td>
 							<td>0</td>
 						</tr>
 					</tbody>
@@ -488,8 +489,12 @@
 								Manual Policy
 							</label>
 							<label class="selectbar-option">
-								<input type="radio" value="learned" name="use-policy" checked="checked" />
+								<input type="radio" value="learned" name="use-policy" />
 								Learned Policy
+							</label>
+							<label class="selectbar-option">
+								<input type="radio" value="pre-trained" name="use-policy" checked="checked" />
+								Pre-trained Policy
 							</label>
 						</div>
 					</form>
@@ -497,24 +502,34 @@
 				<hr />
 				<div class="summary">
 					<div class="summary-parts">
-						<div class="summary-field">
+						<div class="summary-field" style="display: none">
 							<div class="summary-field-title">Total units sold</div>
 							<div class="summary-field-amount" id="total-units">123</div>
 						</div>
-						<div class="summary-field">
+						<div class="summary-field" style="display: none">
 							<div class="summary-field-title">Total revenue</div>
 							<div class="summary-field-amount" id="total-revenue">$3164</div>
 						</div>
-						<div class="summary-field">
+						<div class="summary-field" style="display: none">
 							<div class="summary-field-title">Total costs</div>
-							<div class="summary-field-amount" id="total-costs">$5945</div>
+							<div class="summary-field-amount" id="total-costs-none">$5945</div>
+						</div>
+						<div class="summary-field">
+							<div class="summary-field-title">Understock costs</div>
+							<div class="summary-field-amount" id="understock-costs">$0</div>
+						</div>
+						<div class="summary-field">
+							<div class="summary-field-title">Overstock costs</div>
+							<div class="summary-field-amount" id="overstock-costs">$0</div>
 						</div>
 					</div>
 					<div class="summary-total">
-						<div class="summary-total-title">Total profit</div>
-						<div id="total-profit">$105411 - $523156 = $23212</div>
-						<div class="goal">Goal: $<span id="goal">70000</span></div>
-						<div class="goal-bar">
+						<div class="summary-total-title" style="display: none">Total profit</div>
+						<div id="total-profit" style="display: none">$105411 - $523156 = $23212</div>
+						<div class="summary-total-title">Total costs</div>
+						<div id="total-costs">$0 + $0 = $0</div>
+						<div class="goal" style="display: none">Goal: $<span id="goal">70000</span></div>
+						<div class="goal-bar" style="display: none">
 							<div class="goal-progress" id="total-profit-progress"></div>
 						</div>
 					</div>
@@ -748,6 +763,9 @@
 			function isManual() {
 				return document.getElementById('use-policy')['use-policy'].value == 'manual';
 			}
+			function isPreTrained() {
+				return document.getElementById('use-policy')['use-policy'].value == 'pre-trained';
+			}
 			console.log('isManual', isManual());
 
 			function openSettings() {
@@ -769,16 +787,18 @@
 					}
 					console.log(results);
 					let { intervalRange, intervalStep } = results;
-					let mapping = {};
+					let mapping = [];
 					for (let value = intervalRange[0]; value <= intervalRange[1]; value += intervalStep) {
-						mapping[value] = 'N/A';
+						mapping[value | 0] = ['N/A', 'N/A', 'N/A', 'N/A'];
 					}
-					updateTable(Object.entries(mapping));
+					updateTable(mapping);
 
 					let [problem, controller] = run_simulation(results, results.theta);
 
 					let remainingDay = document.getElementById('remaining-day');
 					let totalCosts = document.getElementById('total-costs');
+					let understockCosts = document.getElementById('understock-costs');
+					let overstockCosts = document.getElementById('overstock-costs');
 					let totalUnits = document.getElementById('total-units');
 					let totalRevenue = document.getElementById('total-revenue');
 					let totalProfit = document.getElementById('total-profit');
@@ -794,7 +814,9 @@
 
 					totalUnits.innerHTML = `0`;
 					totalRevenue.innerHTML = `$0`;
-					totalCosts.innerHTML = `$0`;
+					understockCosts.innerHTML = `$0`;
+					overstockCosts.innerHTML = `$0`;
+					totalCosts.innerHTML = `$0 + $0 = $0`;
 					totalProfit.innerHTML = `$0 - $0 = $0`;
 					totalProfitProgress.style.width = `0%`;
 
@@ -961,15 +983,19 @@
 									let costs = -record.accum_reward.toFixed(1);
 									let profit = revenue - costs;
 									let progress = Math.min(1, profit / results.goal) * 100;
+									let understock = record.accum_understock_reward.toFixed(1);
+									let overstock = record.accum_overstock_reward.toFixed(1);
 
 									totalUnits.innerHTML = `${accum_units}`;
 									totalRevenue.innerHTML = `$${revenue}`;
-									totalCosts.innerHTML = `$${costs}`;
-									totalProfit.innerHTML = `$${revenue} - $${costs} = $${profit}`;
+									understockCosts.innerHTML = `$${understock}`;
+									overstockCosts.innerHTML = `$${overstock}`;
+									totalCosts.innerHTML = `$${understock} + $${overstock} = $${costs.toFixed(1)}`;
+									// totalProfit.innerHTML = `$${revenue} - $${costs} = $${profit}`;
 
 									totalProfitProgress.style.width = `${progress}%`;
 
-									animateState?.handler.pause();
+									animateState?.handler?.pause();
 									animateState = animatePath(truckPath, results.time - 20);
 
 									if (getPlayPauseState()) {
@@ -982,6 +1008,7 @@
 								return;
 							}
 
+							problem.preTrained = isPreTrained();
 							problem.manualPolicy = null;
 
 							let { value, done } = controller.next();
@@ -995,8 +1022,29 @@
 							let quantity = choice.quantity;
 							let order = record.decision.order;
 							let demand = record.nextState.demand;
-							mapping[quantity] = choice.getIEValue();
-							updateTable(Object.entries(mapping));
+
+							let offset = order - quantity;
+							mapping = mapping.map((elem, index) => {
+								elem[0] = index + offset;
+								return elem;
+							});
+							mapping[quantity | 0] = [
+								order,
+								record.reward,
+								(record.accum_reward / record.choice.n).toFixed(2),
+								choice.getIEValue().toFixed(2),
+							];
+
+							if (isPreTrained()) {
+								mapping = mapping.map((elem, index) => {
+									elem[0] = index + offset;
+									elem[3] = problem.preTrainedAgent.choices[index].getIEValue();
+									return elem;
+								});
+							}
+
+							console.log(record);
+							updateTable(mapping);
 
 							choiceHist[quantity] = (choiceHist[quantity] || 0) + 1;
 
@@ -1024,18 +1072,24 @@
 							}
 							// let costs = (-record.accum_reward + accum_units * orderCost).toFixed(1);
 							// let costs = -(record.accum_reward - accum_reward_at_timestep).toFixed(1);
+							// let costs = -record.accum_reward.toFixed(1);
 							let costs = -record.accum_reward.toFixed(1);
 							let profit = revenue - costs;
 							let progress = Math.min(1, profit / results.goal) * 100;
 
+							let understock = record.accum_understock_reward.toFixed(1);
+							let overstock = record.accum_overstock_reward.toFixed(1);
+
 							totalUnits.innerHTML = `${accum_units}`;
 							totalRevenue.innerHTML = `$${revenue}`;
-							totalCosts.innerHTML = `$${costs}`;
-							totalProfit.innerHTML = `$${revenue} - $${costs} = $${profit}`;
+							understockCosts.innerHTML = `$${understock}`;
+							overstockCosts.innerHTML = `$${overstock}`;
+							totalCosts.innerHTML = `$${understock} + $${overstock} = $${costs.toFixed(1)}`;
+							// totalProfit.innerHTML = `$${revenue} - $${costs} = $${profit}`;
 
 							totalProfitProgress.style.width = `${progress}%`;
 
-							animateState?.handler.pause();
+							animateState?.handler?.pause();
 							animateState = animatePath(truckPath, results.time - 20);
 
 							if (getPlayPauseState()) {

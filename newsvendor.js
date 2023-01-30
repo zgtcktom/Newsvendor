@@ -1,9 +1,15 @@
 'use strict';
+let seed = '123456789';
+let random;
+function resetSeed() {
+    random = new Math.seedrandom(seed);
+}
+resetSeed();
 window.Newsvendor = (function () {
-    var randint = (min, max) => Math.floor(Math.random() * (max - min)) + min;
+    var randint = (min, max) => Math.floor(random() * (max - min)) + min;
     var gaussianRandom = (mean = 0, stdev = 1) => {
-        let u = 1 - Math.random();
-        let v = Math.random();
+        let u = 1 - random();
+        let v = random();
         let z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
         return z * stdev + mean;
     };
@@ -70,8 +76,10 @@ window.Newsvendor = (function () {
             // console.log(action)
             // console.log('overage', Math.max(order - demand, 0), 'underage', Math.max(demand - order, 0));
 
-            let penalty = overageCost * Math.max(order - demand, 0) + underageCost * Math.max(demand - order, 0);
-            return -penalty;
+            let overstock = overageCost * Math.max(order - demand, 0);
+            let understock = underageCost * Math.max(demand - order, 0);
+            let penalty = overstock + understock;
+            return { total: -penalty, overstock, understock };
         }
 
         step(action) {
@@ -168,9 +176,12 @@ window.Newsvendor = (function () {
 
     class Newsvendor {
         constructor(params) {
+            resetSeed();
             this.params = params;
             this.env = new Model(params);
             this.manualPolicy = null;
+            this.preTrained = false;
+            this.preTrainedAgent;
         }
 
         *runIter(theta, verbose = false) {
@@ -179,41 +190,84 @@ window.Newsvendor = (function () {
             let env = this.env;
 
             let T = params.iterations;
+            let pretrainedT = 100000;
+            let preTrainedAgent = this.preTrainedAgent = new LearningAgent({ ...params, iterations: T + pretrainedT }, 2);
+
+            env.reset();
+            for (let t = 0; t < pretrainedT; t++) {
+                let action = preTrainedAgent.action();
+                let choice = preTrainedAgent.getLearningChoice();
+
+                let { reward } = env.step(action);
+                let { total } = reward;
+                reward = total;
+                choice.update(reward);
+            }
 
             env.reset();
 
             let accum_reward = 0;
+            let accum_overstock_reward = 0;
+            let accum_understock_reward = 0;
 
             for (let t = 0; t < T; t++) {
-                let action = agent.action();
-                if (verbose) console.log(agent.choices.map(choice => choice.getIEValue()));
-
-                let choice = agent.getLearningChoice();
-                if (verbose) console.log('getLearningChoice', choice);
-
                 let record = {};
-                record.agent = agent;
-                record.choice = choice;
-                record.timestep = t;
-                record.state = env.state;
-                record.action = action;
 
-                if (this.manualPolicy) {
+                let action, choice;
+
+                if (this.manualPolicy != null) {
                     let { reward, decision } = env.stepManual(this.manualPolicy);
+                    let { understock, overstock, total } = reward;
+                    reward = total;
                     record.decision = decision;
                     record.reward = reward;
+                    record.understock = understock;
+                    record.overstock = overstock;
                     record.nextState = env.state;
 
+                    accum_overstock_reward += overstock;
+                    accum_understock_reward += understock;
                     accum_reward += reward;
                     record.accum_reward = accum_reward;
+                    record.accum_overstock_reward = accum_overstock_reward;
+                    record.accum_understock_reward = accum_understock_reward;
 
                     if (verbose) console.log(record);
 
                     yield record;
                     continue;
+                } else if (this.preTrained) {
+                    action = preTrainedAgent.action();
+                    if (verbose) console.log(preTrainedAgent.choices.map(choice => choice.getIEValue()));
+
+                    choice = preTrainedAgent.getLearningChoice();
+                    if (verbose) console.log('getLearningChoice', choice);
+
+                    record.agent = preTrainedAgent;
+                    record.choice = choice;
+                    record.timestep = t;
+                    record.state = env.state;
+                    record.action = action;
+                } else {
+
+                    action = agent.action();
+                    if (verbose) console.log(agent.choices.map(choice => choice.getIEValue()));
+
+                    choice = agent.getLearningChoice();
+                    if (verbose) console.log('getLearningChoice', choice);
+
+                    record.agent = agent;
+                    record.choice = choice;
+                    record.timestep = t;
+                    record.state = env.state;
+                    record.action = action;
                 }
 
                 let { reward, decision } = env.step(action);
+                let { understock, overstock, total } = reward;
+                reward = total;
+                record.understock = understock;
+                record.overstock = overstock;
                 record.decision = decision;
                 record.reward = reward;
                 record.nextState = env.state;
@@ -221,7 +275,11 @@ window.Newsvendor = (function () {
                 choice.update(reward);
 
                 accum_reward += reward;
+                accum_overstock_reward += overstock;
+                accum_understock_reward += understock;
                 record.accum_reward = accum_reward;
+                record.accum_overstock_reward = accum_overstock_reward;
+                record.accum_understock_reward = accum_understock_reward;
 
                 // console.log(`t=${t}, action=`, action, `, decision=`, decision, `, reward=${reward}`);
                 if (verbose) console.log(record);
