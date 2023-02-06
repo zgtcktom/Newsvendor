@@ -4,7 +4,11 @@ let random;
 function resetSeed() {
     random = new Math.seedrandom(seed);
 }
-resetSeed();
+
+window.setSeed = function (newSeed) {
+    seed = newSeed;
+};
+
 window.Newsvendor = (function () {
     var randint = (min, max) => Math.floor(random() * (max - min)) + min;
     var gaussianRandom = (mean = 0, stdev = 1) => {
@@ -29,8 +33,6 @@ window.Newsvendor = (function () {
             return [demand, estimate];
         }
     };
-
-
 
     // state_names_field = ['estimate', 'source_bias', 'central_bias']
     // decision_names_field = ['quantity_requested', 'bias_applied']
@@ -131,11 +133,20 @@ window.Newsvendor = (function () {
             this.estimate = initialEstimate;
 
             this.nu = 1;
+
+            this.reward;
+            this.averageReward;
         }
 
         //update the beliefs of this choice
         update(reward) {
             this.n++;
+            this.reward = reward;
+            if (this.n == 1) {
+                this.averageReward = reward;
+            } else {
+                this.averageReward = (this.averageReward * (this.n - 1) + reward) / this.n;
+            }
 
             // UCB
             // this.nu=this.nu/(1+this.nu-this.nuBar);
@@ -182,11 +193,12 @@ window.Newsvendor = (function () {
             this.manualPolicy = null;
             this.preTrained = false;
             this.preTrainedAgent;
+            this.learningAgent;
         }
 
         *runIter(theta, verbose = false) {
             let params = this.params;
-            let agent = new LearningAgent(params, theta);
+            let agent = this.learningAgent = new LearningAgent(params, theta);
             let env = this.env;
 
             let T = params.iterations;
