@@ -52,6 +52,8 @@ function updateTable(rows) {
     }
     table.append(fragment);
 }
+
+let popupFirst;
 window.popup = function popup(form, hiddenFields, displayNames) {
     let data = {};
     let fragment = document.createDocumentFragment();
@@ -61,16 +63,21 @@ window.popup = function popup(form, hiddenFields, displayNames) {
         let label = document.createElement('label');
         let input = document.createElement('input');
         label.innerHTML = displayNames?.[field] ?? field;
-        input.setAttribute('type', 'text');
+        input.setAttribute('type', typeof form[field] == 'number' ? 'number' : 'text');
         input.value = form[field];
         fieldElement.append(label, input);
 
-        if (!hiddenFields.includes(field)) fragment.append(fieldElement);
+        if (!hiddenFields.includes(field)) {
+            fragment.append(fieldElement);
+            popupFirst = popupFirst ?? input;
+        }
         data[field] = () => input.value;
+
     }
     let formField = document.getElementById('popup-form');
     formField.innerHTML = '';
     formField.appendChild(fragment);
+
     return data;
 };
 
@@ -81,10 +88,15 @@ function hide() {
     hide2();
 }
 
+let pause;
+
 function show() {
     let popup = document.getElementById('popup');
     popup.parentElement.style.display = 'block';
     popupBg(hide);
+
+    pause?.();
+    popupFirst?.focus();
 }
 
 let popupBackground = document.getElementById('popup-background');
@@ -97,24 +109,31 @@ function popupBg(hide) {
     };
 }
 
-window.popup2 = function popup2(form) {
+let popup2First;
+window.popup2 = function popup2(form, displayNames) {
     let data = {};
     let fragment = document.createDocumentFragment();
+    let first;
     for (let field of Object.keys(form)) {
         let fieldElement = document.createElement('div');
         fieldElement.classList.add('form-field');
         let label = document.createElement('label');
         let input = document.createElement('input');
-        label.innerHTML = field;
-        input.setAttribute('type', 'text');
+        label.innerHTML = displayNames?.[field] ?? field;
+        input.setAttribute('type', typeof form[field] == 'number' ? 'number' : 'text');
         input.value = form[field];
         fieldElement.append(label, input);
         fragment.append(fieldElement);
         data[field] = () => input.value;
+
+        popup2First = popup2First ?? input;
     }
     let formField = document.getElementById('popup-form2');
     formField.innerHTML = '';
     formField.appendChild(fragment);
+
+    first?.focus();
+    console.log('first', first)
     return data;
 };
 
@@ -128,6 +147,8 @@ function show2() {
     let popup = document.getElementById('popup2');
     popup.parentElement.style.display = 'block';
     popupBg(hide2);
+
+    popup2First?.focus();
 }
 
 function hideAll() {
@@ -152,7 +173,7 @@ function run_simulation(params, theta = 0) {
     ];
 }
 
-let manualInput = popup2({ amount: 0 });
+let manualInput = popup2({ amount: 0 }, { amount: 'Order quantity' });
 
 let data = popup(
     {
@@ -244,7 +265,7 @@ function openSettings() {
             results[key] = value;
         }
 
-        playgroundMsg.innerHTML = `Demand distribution = uniform(${results.lower}, ${results.upper})`;
+        playgroundMsg.innerHTML = `Minimum demand: ${results.lower}, Maximum demand: ${results.upper}`;
 
         window.setSeed(results.seed);
         results.time *= 1000;
@@ -433,6 +454,18 @@ function openSettings() {
                 console.log(isManual());
                 if (isManual()) {
                     let confirm2 = document.getElementById('confirm2');
+
+                    document.onkeydown = (e) => {
+                        if (e.key == 'Enter') {
+                            e.preventDefault();
+                            confirm2.onclick();
+                            document.onkeydown = null;
+                        } else if (e.key == 'Escape') {
+                            e.preventDefault();
+                            hideAll();
+                        }
+                    };
+
                     confirm2.onclick = () => {
                         console.log(manualInput, manualInput.amount());
                         problem.manualPolicy = { order: manualInput.amount() };
@@ -683,10 +716,23 @@ function openSettings() {
         resumePlayState();
         oninput();
 
-        return [data, resumePlayState];
+        return [data, resumePlayState, () => clearInterval(handler)];
     }
     let confirm = document.getElementById('confirm');
-    confirm.onclick = () => ([data, resumePlayState] = submitSettings(data));
+    document.onkeydown = (e) => {
+        if (e.key == 'Enter') {
+            e.preventDefault();
+            confirm.onclick();
+            document.onkeydown = null;
+        } else if (e.key == 'Escape') {
+            e.preventDefault();
+            hideAll();
+            resumePlayState?.();
+        }
+    };
+    confirm.onclick = () => {
+        [data, resumePlayState, pause] = submitSettings(data);
+    };
     show();
 }
 let playground = document.getElementById('playground'),
