@@ -22,6 +22,7 @@ export class ActionSpace {
             }
             return [action_name, Is_greedy];
         }
+
         if (this.ACTION_NUMBER == 2) {
             Is_greedy = 0;
             // limit = 0;

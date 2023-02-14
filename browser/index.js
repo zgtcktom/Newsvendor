@@ -9,7 +9,7 @@ playButton.onclick = pauseButton.onclick = () => togglePlayPause();
 let resumePlayState = () => { };
 
 function setPlayPause(state) {
-    if (toggleState) {
+    if (toggleState = state) {
         playButton.style.display = '';
         pauseButton.style.display = 'none';
         resumePlayState();
@@ -20,8 +20,7 @@ function setPlayPause(state) {
 }
 
 function togglePlayPause() {
-    toggleState = !toggleState;
-    setPlayPause(toggleState);
+    setPlayPause(!toggleState);
 }
 
 function getPlayPauseState() {
@@ -54,7 +53,7 @@ function updateTable(rows) {
 }
 
 let popupFirst;
-window.popup = function popup(form, hiddenFields, displayNames) {
+function popup(form, hiddenFields, displayNames) {
     let data = {};
     let fragment = document.createDocumentFragment();
     for (let field of Object.keys(form)) {
@@ -80,6 +79,8 @@ window.popup = function popup(form, hiddenFields, displayNames) {
 
     return data;
 };
+
+window.popup = popup;
 
 function hide() {
     let popup = document.getElementById('popup');
@@ -110,7 +111,7 @@ function popupBg(hide) {
 }
 
 let popup2First;
-window.popup2 = function popup2(form, displayNames) {
+function popup2(form, displayNames, callbacks) {
     let data = {};
     let fragment = document.createDocumentFragment();
     let first;
@@ -126,16 +127,21 @@ window.popup2 = function popup2(form, displayNames) {
         fragment.append(fieldElement);
         data[field] = () => input.value;
 
-        popup2First = popup2First ?? input;
+        callbacks?.[field]?.(label, input);
+
+        if (!input.disabled) {
+            popup2First = popup2First ?? input;
+        }
     }
     let formField = document.getElementById('popup-form2');
     formField.innerHTML = '';
     formField.appendChild(fragment);
 
-    first?.focus();
-    console.log('first', first)
+    // first?.focus();
+    // console.log('first', first)
     return data;
 };
+window.popup2 = popup2;
 
 function hide2() {
     let popup = document.getElementById('popup2');
@@ -149,6 +155,7 @@ function show2() {
     popupBg(hide2);
 
     popup2First?.focus();
+    popup2First?.select();
 }
 
 function hideAll() {
@@ -173,7 +180,17 @@ function run_simulation(params, theta = 0) {
     ];
 }
 
-let manualInput = popup2({ amount: 0 }, { amount: 'Order quantity' });
+let setPrevDemand;
+
+let manualInput = popup2({
+    prevDemand: 0,
+    amount: 0,
+}, {
+    prevDemand: 'Previous demand',
+    amount: 'Order quantity'
+}, {
+    prevDemand(label, input) { input.disabled = true; setPrevDemand = (value) => { input.value = value; }; }
+});
 
 let data = popup(
     {
@@ -278,6 +295,10 @@ function openSettings() {
 
         let oninput = () => {
             if (isManual()) {
+                if (mapping != manualMapping) {
+                    setPlayPause(0);
+                    next.onclick?.();
+                }
                 mapping = manualMapping;
                 debug && console.log('switch manual mapping');
             } else if (isPreTrained()) {
@@ -482,6 +503,8 @@ function openSettings() {
                         let order = problem.manualPolicy.order;
                         let demand = record.nextState.demand;
 
+                        setPrevDemand?.(demand);
+
                         demand_history.push(demand);
                         order_history.push(order);
 
@@ -590,6 +613,8 @@ function openSettings() {
                 let quantity = choice.quantity;
                 let order = record.decision.order;
                 let demand = record.nextState.demand;
+
+                setPrevDemand?.(demand);
 
                 let offset = order - quantity;
                 if (isPreTrained()) {
