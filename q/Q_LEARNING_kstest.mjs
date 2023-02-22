@@ -97,6 +97,8 @@ export class RL_brain_kstest {
         let IP_ = Math.min(Math.max(S_ - lost + sum(a.slice(-(this.LEAD_TIME - 1))), -(30) | 0), (this.N_STATES - 30 - 1) | 0);
         R = Ro + Rs;
 
+        // console.log(a.slice(-(this.LEAD_TIME - 1))); throw '';
+
         // console.log('IP_', IP_, S_, lost, a, sum(a.slice(-(this.LEAD_TIME - 1))));
         return [S_, IP_, IL_, R, lost, demand];
     }
@@ -182,7 +184,7 @@ export class RL_brain_kstest {
             EPSILON = this.search_then_converge(EPSILON, i);
             ALPHA = this.search_then_converge2(ALPHA, i);
 
-            // console.log('EPSILON, ALPHA', EPSILON, ALPHA)
+            console.log('EPSILON, ALPHA', EPSILON, ALPHA)
 
             let count_ = 0;
             let lost = 0;
@@ -217,6 +219,7 @@ export class RL_brain_kstest {
                     let kstest_new = stats.ks_2samp(demand_test1, demand_test2);
 
                     if (kstest_new[1] <= 0.0001) {
+                        console.log(kstest_new[1])
                         //     #             if (kstest_new[1] <= 0.01) and (kstest_old1[1] <= 0.01) and (kstest_old2[1] <= 0.01) and (kstest_old0[1] <= 0.001):
                         // #                     if change == 0:
                         freeze = episode;
@@ -257,7 +260,7 @@ export class RL_brain_kstest {
                         R_count = R_count + R;
                         // console.log('q_table_1[IP.at(-(this.LEAD_TIME - 1))]', q_table_1[IP.at(-(this.LEAD_TIME - 1))], IP.at(-(this.LEAD_TIME - 1)))
                         let q_target = R + GAMMA * Math.max(...q_table_1.at(IP.at(-(this.LEAD_TIME - 1))));
-                        q_table_1.at(IP.at(-this.LEAD_TIME))[a.at(-this.LEAD_TIME) < 0 ? q_table_1.at(IP.at(-this.LEAD_TIME)) + a.at(-this.LEAD_TIME) : a.at(-this.LEAD_TIME)] = q_table_1.at(IP.at(-this.LEAD_TIME)).at(a.at(-this.LEAD_TIME)) + ALPHA * (q_target - q_predict); //# update
+                        q_table_1.at(IP.at(-this.LEAD_TIME))[a.at(-this.LEAD_TIME) < 0 ? q_table_1.at(IP.at(-this.LEAD_TIME)).length + a.at(-this.LEAD_TIME) : a.at(-this.LEAD_TIME)] = q_table_1.at(IP.at(-this.LEAD_TIME)).at(a.at(-this.LEAD_TIME)) + ALPHA * (q_target - q_predict); //# update
                         Q_values = q_table_1.at(IP.at(-this.LEAD_TIME)).at(a.at(-this.LEAD_TIME));
                         Q_VALUES.push(Q_values);
                         Q_PREDICT.push(q_predict);
@@ -287,7 +290,8 @@ export class RL_brain_kstest {
                         let q_predict = q_table_2.at(IP.at(-this.LEAD_TIME)).at(a.at(-this.LEAD_TIME));
                         R_count = R_count + R;
                         let q_target = R + GAMMA * Math.max(...q_table_2.at(IP.at(-(this.LEAD_TIME - 1))));
-                        q_table_2.at(IP.at(-this.LEAD_TIME))[a.at(-this.LEAD_TIME) < 0 ? q_table_2.at(IP.at(-this.LEAD_TIME)) + a.at(-this.LEAD_TIME) : a.at(-this.LEAD_TIME)] = q_table_2.at(IP.at(-this.LEAD_TIME)).at(a.at(-this.LEAD_TIME)) + ALPHA * (q_target - q_predict); // # update
+                        // console.log(a.at(-this.LEAD_TIME) < 0 ? q_table_2.at(IP.at(-this.LEAD_TIME)).length + a.at(-this.LEAD_TIME) : a.at(-this.LEAD_TIME))
+                        q_table_2.at(IP.at(-this.LEAD_TIME))[a.at(-this.LEAD_TIME) < 0 ? q_table_2.at(IP.at(-this.LEAD_TIME)).length + a.at(-this.LEAD_TIME) : a.at(-this.LEAD_TIME)] = q_table_2.at(IP.at(-this.LEAD_TIME)).at(a.at(-this.LEAD_TIME)) + ALPHA * (q_target - q_predict); // # update
                         Q_values = q_table_2.at(IP.at(-this.LEAD_TIME)).at(a.at(-this.LEAD_TIME));
                         Q_VALUES.push(Q_values);
                         Q_PREDICT.push(q_predict);

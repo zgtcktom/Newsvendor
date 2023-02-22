@@ -48,3 +48,5 @@ let method = new RL_brain_kstest(MEAN1, VAR1, MEAN2, VAR2, LEADTIME,
     N_STATES, ACTIONS, SIMULATION_TIME, ACTION_NUMBER, upperlimit_constant);
 
 let [q_table_1, q_table_2, R_episode, simulation_time, Inv_state, a__, Onhand_state] = method.rl();
+
+// console.log(q_table_1)

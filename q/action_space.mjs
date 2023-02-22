@@ -13,6 +13,7 @@ export class ActionSpace {
         if (this.ACTION_NUMBER == 1) {
             Is_greedy = 0;
             state_actions = q_table.loc[state].map((e, i) => [e, i]).slice();
+            console.log(state_actions)
             action_name;
             if (random.uniform() > (1 - eps)) {
                 action_name = random.choice(state_actions.map(([e, i]) => i));
