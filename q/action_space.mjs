@@ -54,7 +54,8 @@ export class ActionSpace {
                 action_name = 0;
             } else {
                 // console.log(q_table,state);
-                state_actions = q_table[state].map((e, i) => [e, i]).slice(Lower_limit, Upper_limit);
+                // console.log('state', state)
+                state_actions = q_table.at(state).map((e, i) => [e, i]).slice(Lower_limit, Upper_limit);
                 if (random.uniform() > (1 - eps)) {
                     action_name = random.choice(state_actions.map(([e, i]) => i));
                 } else {
@@ -66,12 +67,12 @@ export class ActionSpace {
         }
     }
 
-    choose_action2(self, state, q_table, eps, r_estimate, rstar1, rstar2, upperlimit_constant) {
+    choose_action2(state, q_table, eps, r_estimate, rstar1, rstar2, upperlimit_constant) {
         let Is_greedy, state_actions, action_name, Upper_limit, Lower_limit, limit;
 
         if (this.ACTION_NUMBER == 1) {
             Is_greedy = 0;
-            state_actions = q_table[state].map((e, i) => [e, i]).slice();
+            state_actions = q_table.at(state).map((e, i) => [e, i]).slice();
             if (random.uniform() > (1 - eps)) {
 
                 action_name = random.choice(state_actions.map(([e, i]) => i))
@@ -90,7 +91,7 @@ export class ActionSpace {
             if (Upper_limit == Lower_limit) {
                 action_name = 0;
             } else {
-                state_actions = q_table[state].map((e, i) => [e, i]).slice(Lower_limit, Upper_limit);
+                state_actions = q_table.at(state).map((e, i) => [e, i]).slice(Lower_limit, Upper_limit);
                 if (random.uniform() > (1 - eps)) {
 
                     action_name = random.choice(state_actions.map(([e, i]) => i));
@@ -105,12 +106,13 @@ export class ActionSpace {
         if (this.ACTION_NUMBER == 3) {
             Is_greedy = 0;
             // limit = 0;
-            Upper_limit = max(0, r_estimate - state + upperlimit_constant);
+            Upper_limit = Math.max(0, r_estimate - state + upperlimit_constant);
             Lower_limit = 0;
             if (Upper_limit == Lower_limit) {
                 action_name = 0;
             } else {
-                state_actions = q_table[state].map((e, i) => [e, i]).slice(Lower_limit, Upper_limit);
+                // console.log('q_table', q_table)
+                state_actions = q_table.at(state).map((e, i) => [e, i]).slice(Lower_limit, Upper_limit);
                 if (random.uniform() > (1 - eps)) {
 
                     action_name = random.choice(state_actions.map(([e, i]) => i));

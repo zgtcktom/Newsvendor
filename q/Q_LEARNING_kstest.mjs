@@ -53,11 +53,13 @@ export class RL_brain_kstest {
 
     simulation(S, R, a, episode, LOST) {
         let demand;
-        if ((episode <= 182) || (365 <= episode <= (182 * 3 + 1)) || ((365 * 2) <= episode <= (182 * 5 + 1))) {
+        if ((episode <= 182) || (365 <= episode && episode <= (182 * 3 + 1)) || ((365 * 2) <= episode && episode <= (182 * 5 + 1))) {
             demand = Math.max(Math.round(random.normal(this.MEAN1, Math.sqrt(this.VAR1))), 0);
         } else {
             demand = Math.max(Math.round(random.normal(this.MEAN2, Math.sqrt(this.VAR2))), 0);
         }
+
+        // console.log('demand', demand, this.MEAN1, Math.sqrt(this.VAR1)); throw '';
 
         let Co = -this.HOLDING_COST;// #cost of holding (According to the paper, it should be the cost of outdating.But for simplification, holding cost is used in this version) 1/2
         let Cs = -this.BACKLOG_COST; //#cost of backlog cost (assumes a charge per unit time a customer order is not filled)
@@ -68,13 +70,13 @@ export class RL_brain_kstest {
 
         let S_, lost;
         if (episode >= this.LEAD_TIME - 1) {
-            if (S + a[-this.LEAD_TIME] - lost_ >= demand) {
-                S_ = S + a[-this.LEAD_TIME] - demand - lost_;
+            if (S + a.at(-this.LEAD_TIME) - lost_ >= demand) {
+                S_ = S + a.at(-this.LEAD_TIME) - demand - lost_;
                 IL_ = S_;
                 Ro = Co * S_;
                 lost = 0;
             } else {
-                lost = lost_ - a[-this.LEAD_TIME] + demand - S;
+                lost = lost_ - a.at(-this.LEAD_TIME) + demand - S;
                 IL_ = -lost;
                 Rs = Cs * lost;
                 S_ = 0;
@@ -95,7 +97,7 @@ export class RL_brain_kstest {
         let IP_ = Math.min(Math.max(S_ - lost + sum(a.slice(-(this.LEAD_TIME - 1))), -(30) | 0), (this.N_STATES - 30 - 1) | 0);
         R = Ro + Rs;
 
-        console.log('IP_', IP_, S_, lost, a, sum(a.slice(-(this.LEAD_TIME - 1))));
+        // console.log('IP_', IP_, S_, lost, a, sum(a.slice(-(this.LEAD_TIME - 1))));
         return [S_, IP_, IL_, R, lost, demand];
     }
 
@@ -134,6 +136,7 @@ export class RL_brain_kstest {
         let rstar1 = new Reorder(this.MEAN1, this.VAR1, this.LEAD_TIME, this.HOLDING_COST, this.BACKLOG_COST).getBasestock();
         let rstar2 = new Reorder(this.MEAN2, this.VAR2, this.LEAD_TIME, this.HOLDING_COST, this.BACKLOG_COST).getBasestock();
 
+        // console.log('rstar1, rstar2', rstar1, rstar2);
         let a;
         let Onhand_state;
         // # the outer loop        
@@ -179,6 +182,8 @@ export class RL_brain_kstest {
             EPSILON = this.search_then_converge(EPSILON, i);
             ALPHA = this.search_then_converge2(ALPHA, i);
 
+            // console.log('EPSILON, ALPHA', EPSILON, ALPHA)
+
             let count_ = 0;
             let lost = 0;
             let Q_values = 0;
@@ -201,6 +206,7 @@ export class RL_brain_kstest {
                 let demand;
                 [S_, IP_, IL_, R, lost, demand] = this.simulation(S[episode], R, a, episode, LOST[episode]); // # take action & get next state and reward
                 OO_ = sum(a.slice(-(this.LEAD_TIME - 1)));
+                // print(S_, IP_, IL_, R, lost, demand, OO_); throw ''
                 // #senario 1
                 if (episode >= 40 && episode - freeze > 70) {
                     let demand_test1 = DEMAND.slice(-20);
@@ -247,11 +253,12 @@ export class RL_brain_kstest {
                     } else if (episode - freeze >= this.LEAD_TIME) {
                         // #                     print("episode:",episode)
 
-                        let q_predict = q_table_1.loc[IP[-this.LEAD_TIME], a[-this.LEAD_TIME]];
+                        let q_predict = q_table_1.at(IP.at(-this.LEAD_TIME)).at(a.at(-this.LEAD_TIME));
                         R_count = R_count + R;
-                        let q_target = R + GAMMA * q_table_1.loc[IP[-(this.LEAD_TIME - 1)]].max();
-                        q_table_1.loc[IP[-this.LEAD_TIME], a[-this.LEAD_TIME]] = q_table_1.loc[IP[-this.LEAD_TIME], a[-this.LEAD_TIME]] + ALPHA * (q_target - q_predict); //# update
-                        Q_values = q_table_1.loc[IP[-this.LEAD_TIME], a[-this.LEAD_TIME]];
+                        // console.log('q_table_1[IP.at(-(this.LEAD_TIME - 1))]', q_table_1[IP.at(-(this.LEAD_TIME - 1))], IP.at(-(this.LEAD_TIME - 1)))
+                        let q_target = R + GAMMA * Math.max(...q_table_1.at(IP.at(-(this.LEAD_TIME - 1))));
+                        q_table_1.at(IP.at(-this.LEAD_TIME))[a.at(-this.LEAD_TIME) < 0 ? q_table_1.at(IP.at(-this.LEAD_TIME)) + a.at(-this.LEAD_TIME) : a.at(-this.LEAD_TIME)] = q_table_1.at(IP.at(-this.LEAD_TIME)).at(a.at(-this.LEAD_TIME)) + ALPHA * (q_target - q_predict); //# update
+                        Q_values = q_table_1.at(IP.at(-this.LEAD_TIME)).at(a.at(-this.LEAD_TIME));
                         Q_VALUES.push(Q_values);
                         Q_PREDICT.push(q_predict);
                         Q_TARGET.push(q_target);
@@ -277,11 +284,11 @@ export class RL_brain_kstest {
 
                     } else if (episode - freeze >= this.LEAD_TIME) {
                         // #                 else:
-                        let q_predict = q_table_2.loc[IP[-this.LEAD_TIME], a[-this.LEAD_TIME]];
+                        let q_predict = q_table_2.at(IP.at(-this.LEAD_TIME)).at(a.at(-this.LEAD_TIME));
                         R_count = R_count + R;
-                        let q_target = R + GAMMA * q_table_2.loc[IP[-(this.LEAD_TIME - 1)]].max();
-                        q_table_2.loc[IP[-this.LEAD_TIME], a[-this.LEAD_TIME]] = q_table_2.loc[IP[-this.LEAD_TIME], a[-this.LEAD_TIME]] + ALPHA * (q_target - q_predict); // # update
-                        Q_values = q_table_2.loc[IP[-this.LEAD_TIME], a[-this.LEAD_TIME]];
+                        let q_target = R + GAMMA * Math.max(...q_table_2.at(IP.at(-(this.LEAD_TIME - 1))));
+                        q_table_2.at(IP.at(-this.LEAD_TIME))[a.at(-this.LEAD_TIME) < 0 ? q_table_2.at(IP.at(-this.LEAD_TIME)) + a.at(-this.LEAD_TIME) : a.at(-this.LEAD_TIME)] = q_table_2.at(IP.at(-this.LEAD_TIME)).at(a.at(-this.LEAD_TIME)) + ALPHA * (q_target - q_predict); // # update
+                        Q_values = q_table_2.at(IP.at(-this.LEAD_TIME)).at(a.at(-this.LEAD_TIME));
                         Q_VALUES.push(Q_values);
                         Q_PREDICT.push(q_predict);
                         Q_TARGET.push(q_target);
@@ -297,7 +304,7 @@ export class RL_brain_kstest {
                     }
                 }
                 // # move to next state  and action
-                console.log('a_', a_);
+                // console.log('a_', a_);
                 a.push(a_);  // #list of action
                 S.push(S_);  // #list of onhand inventory
                 IP.push(IP_);  //#list of inventory position

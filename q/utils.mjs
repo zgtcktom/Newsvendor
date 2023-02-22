@@ -2,6 +2,8 @@ import * as tf from '@tensorflow/tfjs';
 
 import jStat from 'jstat';
 
+import jerzy from 'jerzy';
+
 export let integrate = {
     trapezoid(f, a, b, dx = 1.0) {
         if (b == Infinity) {
@@ -60,6 +62,15 @@ export let stats = {
             },
         }
     },
+    ks_2samp(a, b) {
+        // revision needed
+        // poor approximation of scipy.stats.ks_2samp
+        let { d, p } = new jerzy.Nonparametric.kolmogorovSmirnov(
+            new jerzy.Vector(a),
+            new jerzy.Vector(b)
+        );
+        return [d, p];
+    }
 };
 
 export let print = (...args) => console.log(...args);
@@ -118,18 +129,18 @@ export let DataFrame = function (array, columns, index) {
 export let random = {
     uniform(minval = 0, maxval = 1, shape) {
         if (shape != undefined) {
-            return tf.randomUniform(shape).dataSync();
+            return tf.randomUniform(shape, minval, maxval).dataSync();
         }
-        return tf.randomUniform([1]).dataSync()[0];
+        return tf.randomUniform([1], minval, maxval).dataSync()[0];
     },
     randint(minval, maxval) {
         return Math.round(random.uniform(minval, maxval));
     },
     normal(mean, std, shape) {
         if (shape != undefined) {
-            return tf.randomNormal(shape).dataSync();
+            return tf.randomNormal(shape, mean, std).dataSync();
         }
-        return tf.randomNormal([1]).dataSync()[0];
+        return tf.randomNormal([1], mean, std).dataSync()[0];
     },
     choice(a, size, replace = true, p) {
         if (typeof a == 'number') {
