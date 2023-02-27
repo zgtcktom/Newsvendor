@@ -84,6 +84,7 @@ export let ndarray = (shape, fill = 0) => {
     let nd;
     if (shape.length > 1) {
         nd = shape.slice(1);
+        console.log(nd)
     }
     for (let i = 0; i < shape[0]; i++) {
         array.push(nd != undefined ? ndarray(nd, fill) : fill);
