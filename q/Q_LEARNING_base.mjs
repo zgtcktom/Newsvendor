@@ -13,29 +13,24 @@ function setitem(array, index, value) {
         i += array.length;
     }
     if (index.length == 1) {
-        // console.log('setitem', array, i, array[i], index)
         if (i == undefined) throw 'setitem';
         array[i] = value;
         return;
     }
-    // console.log('setitem', array, i, array[i], index)
     setitem(array[i], index.slice(1), value);
 }
 
 function getitem(array, index) {
     let i = index[0];
 
-    // console.log(i, array.length);
     while (i < 0) {
         i += array.length;
     }
     if (index.length == 1) {
-        // console.log('getitem', array, i, array[i], index)
         if (i == undefined) throw 'getitem';
         return array[i];
     }
     if (array[i] == undefined) throw '';
-    // console.log(i, array[i], index)
     return getitem(array[i], index.slice(1));
 }
 
