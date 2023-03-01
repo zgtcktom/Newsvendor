@@ -1,3 +1,6 @@
+import { Tester } from './Tester.mjs';
+
+let tester = new Tester();
 
 class Slicer {
     constructor(start, stop, step) {
@@ -43,6 +46,13 @@ class Slicer {
     }
 }
 
+function slice(start, stop, step) {
+    if (is_tuple(start)) {
+        ({ 0: start, 1: stop, 2: step } = start);
+    }
+    return new Slicer(start, stop, step);
+}
+
 class Slice {
     constructor(start, stop, step, slicelength) {
         this.start = start;
@@ -76,22 +86,27 @@ function is_int(value) {
 }
 
 function is_tuple(value) {
-    return value.length != undefined;
+    return value?.length != undefined;
 }
 
 function type(value) {
     return value?.constructor.name;
 }
 
+function prod(a) {
+    let prod = 1;
+    for (let n of a) prod *= n;
+    return prod;
+}
+
 export class NDArray {
-    constructor(shape, buffer, strides = get_strides(shape, 1), offset = 0, itemsize = 1) {
+    constructor(shape, buffer = null, strides = get_strides(shape, 1), offset = 0, itemsize = 1) {
         // https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html
         this.size = get_size(shape);
         this.ndim = shape.length;
         this.base = null;
 
         this.shape = shape;
-        // console.log(shape)
         this.data = buffer ?? new Array(this.size);
         this.itemsize = itemsize;
         this.strides = strides;
@@ -136,8 +151,10 @@ export class NDArray {
             let indices = Array(ndim).fill(0);
             for (let i = 0; i < indices.length - 1; i++) {
                 let size = sizes[i + 1];
-                indices[i] = index / size | 0;
-                index %= size;
+                if (index >= size) {
+                    indices[i] = index / size | 0;
+                    index %= size;
+                }
             }
             indices[indices.length - 1] = index;
             // console.log('sizes', sizes, indices);
@@ -162,9 +179,139 @@ export class NDArray {
     }
 }
 
-console.log(new NDArray([2, 5], [...Array(10).keys()]).getitem(new Slicer(), new Slicer(null, null, -1)));
-console.log(new NDArray([2, 5], [...Array(10).keys()]).getitem(new Slicer(), new Slicer(null, null, -1)).item(9));
-console.log(type(true), type(NaN), Array(10).fill(0));
+function* ndindex(shape, reuse = true) {
+    let index = Array(shape.length).fill(0);
+    let size = prod(shape);
+    if (size == 0) return;
+
+    yield reuse ? index : index.slice();
+    for (let i = 1; i < size; i++) {
+        for (let j = index.length - 1; j >= 0; j--) {
+            index[j] += 1;
+            if (index[j] < shape[j])
+                break;
+            index[j] -= shape[j];
+        }
+        yield reuse ? index : index.slice();
+    }
+}
+
+// for (let i of ndindex([3, 2, 1])) {
+//     console.log(i);
+// }
+// console.log([...ndindex([3, 2, 1], false)]);
+
+export function broadcast_shapes(...shapes) {
+    let ndim = 0;
+    for (let shape of shapes) ndim = Math.max(ndim, shape.length);
+    if (ndim == 0) return [];
+
+    let broadcasted = Array(ndim).fill(1);
+    for (let shape of shapes) {
+        for (let i = shape.length - 1, j = ndim - 1; i >= 0; i--, j--) {
+            let dim = shape[i];
+            if (dim == 1) continue;
+            if (broadcasted[j] == 1) broadcasted[j] = dim;
+            else if (broadcasted[j] != dim) throw 'shape mismatch';
+        }
+    }
+    return broadcasted;
+}
+
+tester.add('broadcast_shapes',
+    () => broadcast_shapes([1, 2], [3, 1], [3, 2]),
+    () => [3, 2]);
+tester.add('broadcast_shapes',
+    () => broadcast_shapes([6, 7], [5, 6, 1], [7], [5, 1, 7]),
+    () => [5, 6, 7]);
+
+export function broadcast_to(array, shape) {
+    if (array.shape.length > shape.length) throw 'broadcast shape has less dimensions than input array';
+
+    let { data, strides, offset, itemsize } = array;
+
+    let new_strides = [];
+    for (let i = shape.length - 1, j = array.shape.length - 1; i >= 0; i--, j--) {
+        if (j >= 0 && array.shape[j] != 1 && array.shape[j] != shape[i]) throw 'operands could not be broadcast together';
+        new_strides[i] = j < 0 || array.shape[j] == 1 ? 0 : strides[j];
+    }
+
+    return new NDArray(shape, data, new_strides, offset, itemsize);
+}
+
+tester.add('broadcast_to',
+    () => broadcast_to(new NDArray([3], [1, 2, 3]), [3, 3]).toarray(),
+    () => [[1, 2, 3], [1, 2, 3], [1, 2, 3]]);
+
+tester.add('broadcast_to',
+    () => broadcast_to(new NDArray([1, 3, 1], [1, 2, 3]), [2, 3, 4]).toarray(),
+    () => [[[1, 1, 1, 1], [2, 2, 2, 2], [3, 3, 3, 3]], [[1, 1, 1, 1], [2, 2, 2, 2], [3, 3, 3, 3]]]);
+
+export function iterable(obj) {
+    return obj?.[Symbol.iterator] != undefined;
+}
+
+function nested_shape(array, shape, level) {
+    for (let i = 0; i < array.length; i++) {
+        if (array[i]?.length != shape[level]) {
+            shape.length = level;
+            return;
+        }
+        if (array[i]?.length != undefined && shape.length > level + 1) {
+            if (!nested_shape(array[i], shape, level + 1)) return;
+        }
+    }
+    return true;
+}
+
+export function shape(array) {
+    if (array.shape != undefined) return array.shape;
+    let shape = [];
+    let elem = array;
+    while (elem?.length != undefined) {
+        shape.push(elem.length);
+        elem = elem[0];
+    }
+    // console.log(shape.length > 1)
+    if (array.length != undefined && shape.length > 1)
+        nested_shape(array, shape, 1);
+    return shape;
+}
+
+tester.add('shape',
+    () => shape([[[3, 9]], [[3, 9, 3]], [[3, 9]]]),
+    () => [3, 1]);
+
+tester.add('shape',
+    () => shape([1, 2, 3, [1, 3]]),
+    () => [4]);
+
+function flatten_with_shape(data, array, shape, level = 0) {
+    if (level == shape.length) {
+        data.push(array);
+        return;
+    }
+    for (let i = 0; i < shape[level]; i++) {
+        flatten_with_shape(data, array[i], shape, level + 1);
+    }
+}
+
+export function array(a) {
+    let data = [];
+    flatten_with_shape(data, a, shape(a));
+    console.log(data);
+}
+
+console.log(array([[[3, 9]], [[3, 9]], [[3, 9]]]))
+
+// console.log(new NDArray([2, 5], [...Array(10).keys()]).getitem(slice(), slice([, , -1])));
+// let a = new NDArray([2, 5], [...Array(10).keys()]).getitem(slice(), slice([, , -1]));
+// console.log(a.item(9));
+// console.log(type(true), type(NaN), Array(10).fill(0));
+
+// for (let index of ndindex(a.shape)) {
+//     console.log(index, a.item(index));
+// }
 
 
 export function ndarray(shape, buffer, strides, offset) {
@@ -173,6 +320,8 @@ export function ndarray(shape, buffer, strides, offset) {
 
 function test() {
     console.log('test', new NDArray([3, 2, 5, 2], [...Array(60).keys()]).getitem(2, new Slicer(null, null, 2), 1).toarray());
+
+    tester.run();
 }
 
 test();
