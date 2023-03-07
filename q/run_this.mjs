@@ -77,15 +77,15 @@ let method = new RL_brain_base(
   upperlimit_constant
 );
 
-let [
-  q_table_1,
-  q_table_2,
-  R_episode,
-  simulation_time,
-  Inv_state,
-  a__,
-  Onhand_state,
-] = method.rl();
+// let [
+//   q_table_1,
+//   q_table_2,
+//   R_episode,
+//   simulation_time,
+//   Inv_state,
+//   a__,
+//   Onhand_state,
+// ] = method.rl();
 
 // function simple_csv(obj) {
 //     let text = '';
@@ -147,7 +147,7 @@ function searchsorted(a, v, side = "left") {
 }
 
 function* zip(...iterables) {
-  let iterators = iterables.map((iter) => iter[Symbol.iterator]());
+  let iterators = iterables.map(iter => iter[Symbol.iterator]());
   while (true) {
     let any = false;
     let result = [];

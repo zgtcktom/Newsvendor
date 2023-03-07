@@ -1440,6 +1440,7 @@ function animatePath(path, duration = 3000) {
 			return state.handler;
 		});
 	}
+    
 	chain.then(() => {
 		if (prevTruck != null) prevTruck.style.display = 'none';
 	});
