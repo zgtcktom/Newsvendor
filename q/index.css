@@ -302,13 +302,15 @@ body {
 
 .summary-parts {
   display: flex;
-  margin-bottom: 2em;
+  margin-bottom: .4em;
   flex-wrap: wrap;
 }
 
 .summary-field {
   flex: 1;
-  min-width: 20ch;
+  max-width: 100ch;
+  min-width: 23ch;
+  margin-bottom: 0.4em;
 }
 
 .summary-field-title {
